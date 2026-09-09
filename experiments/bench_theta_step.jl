@@ -27,8 +27,14 @@ println("particles: 128, iterations: $n_iter")
 
 particle_gibbs(obs; n_particles = 32, n_iter = 20, n_warmup = 10, n_theta_steps = 10)
 
-println("\n", rpad("θ steps", 10), rpad("seconds", 12), rpad("worst ESS", 12),
-    rpad("ESS/s", 12), "accept")
+println(
+    "\n",
+    rpad("θ steps", 10),
+    rpad("seconds", 12),
+    rpad("worst ESS", 12),
+    rpad("ESS/s", 12),
+    "accept",
+)
 for n_theta in (1, 10, 50, 200, 1000)
     r = particle_gibbs(
         obs;

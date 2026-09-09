@@ -22,8 +22,9 @@ Random.seed!(3)
 ## The statistics-carrying filter must give the same log-likelihood as the one
 ## the course uses, or the sampler is targeting a different model.
 lls_stat = [csmc_path(Random.default_rng(), θ, obs, 128, nothing)[2] for _ in 1:40]
-lls_course = [run_particle_filter(θ, obs, 128; init_state = INIT_STATE, threaded = true)
-              for _ in 1:40]
+lls_course = [
+    run_particle_filter(θ, obs, 128; init_state = INIT_STATE, threaded = true) for _ in 1:40
+]
 @printf(
     "log-likelihood: statistics filter %.2f (sd %.2f), course filter %.2f (sd %.2f)\n",
     mean(lls_stat),
@@ -37,12 +38,25 @@ lls_course = [run_particle_filter(θ, obs, 128; init_state = INIT_STATE, threade
 path, _ = csmc_path(Random.default_rng(), θ, obs, 128, nothing)
 inc = [path[t][IDX_INC] for t in 1:length(obs)]
 st = path_stats(path, obs)
-@printf("\npath total incidence %.0f, observed cases %d, ρ × incidence %.0f\n",
-    sum(inc), sum(obs), θ[:ρ] * sum(inc))
-@printf("infections n1 = %.0f, E→I n2 = %.0f (must equal path incidence %.0f)\n",
-    st.n[1], st.n[2], sum(inc))
-@printf("exposures: β %.1f, E %.1f, I %.1f, T %.1f\n",
-    st.exp_beta, st.exp_E, st.exp_I, st.exp_T)
+@printf(
+    "\npath total incidence %.0f, observed cases %d, ρ × incidence %.0f\n",
+    sum(inc),
+    sum(obs),
+    θ[:ρ] * sum(inc)
+)
+@printf(
+    "infections n1 = %.0f, E→I n2 = %.0f (must equal path incidence %.0f)\n",
+    st.n[1],
+    st.n[2],
+    sum(inc)
+)
+@printf(
+    "exposures: β %.1f, E %.1f, I %.1f, T %.1f\n",
+    st.exp_beta,
+    st.exp_E,
+    st.exp_I,
+    st.exp_T
+)
 
 ## Timing of one sweep, against the plain filter the baseline uses.
 csmc_path(Random.default_rng(), θ, obs, 128, path)
@@ -60,8 +74,11 @@ for _ in 1:100
 end
 t_bf = (time() - t) / 100
 
-@printf("\nseconds per sweep: conditional SMC %.5f, course bootstrap filter %.5f\n",
-    t_csmc, t_bf)
+@printf(
+    "\nseconds per sweep: conditional SMC %.5f, course bootstrap filter %.5f\n",
+    t_csmc,
+    t_bf
+)
 
 ## Cost of the parameter step, which is what makes many inner steps affordable.
 step = ThetaStep(6)
@@ -96,5 +113,4 @@ end
     maximum(first_diffs),
     length(obs)
 )
-println("fraction of sweeps that changed nothing: ",
-    mean(first_diffs .== length(obs) + 1))
+println("fraction of sweeps that changed nothing: ", mean(first_diffs .== length(obs) + 1))

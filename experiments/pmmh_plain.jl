@@ -76,9 +76,5 @@ function pmmh_plain(
         iter > n_warmup && (draws[iter - n_warmup, :] .= θ_vec(θ))
     end
 
-    return (
-        draws = draws,
-        elapsed = time() - t_start,
-        accept = moved / n_iter,
-    )
+    return (draws = draws, elapsed = time() - t_start, accept = moved / n_iter)
 end

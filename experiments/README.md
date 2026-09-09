@@ -12,8 +12,7 @@ julia --project=. --threads=12 experiments/<script>.jl
 
 ## State
 
-The particle Gibbs work is finished.
-The proposal isolation in `ablation2.jl` was stopped part way through its last run, so the log ends after four of its five variants.
+Finished. The proposal isolation completed its last run after the decision to stop, so `ablation2.txt` carries all five of its variants.
 
 ## What is here
 
@@ -50,6 +49,7 @@ Every posterior below was checked against `data/pmcmc_seit4l_chain.csv`, and the
 | PMMH, Turing + RAM, log/logit — what the course runs | 247 |
 | Particle Gibbs | 287 |
 | PMMH, RAM, log/logit, reimplemented in a plain loop | 245 |
+| PMMH, RAM, log/logit, given a starting scale | 177 |
 | PMMH, RAM, constrained scale, identity initial factor | 487, and wrong |
 | PMMH, RAM, constrained scale, given a starting scale | 39 |
 | PMMH, empirical covariance + Robbins-Monro scale, log/logit | 62-80 |
@@ -61,9 +61,16 @@ Particle Gibbs is correct and slower.
 Its effective sample size per second is flat in the particle count, because more particles buys proportionally better path mixing and costs proportionally more.
 Sweeping the number of parameter steps per sweep from 1 to 1000 moves it from 0.21 to 0.30 effective draws per second and saturates by 200, so an exact parameter draw given the path still leaves it well behind PMMH, and a gradient-based parameter step cannot recover the gap.
 
-The scale the proposal is made on is what costs the course its mixing, and it costs RAM more than it costs an empirical-covariance proposal.
+The scale the proposal is made on is what costs the course its mixing.
 Turing's `externalsampler` defaults to `unconstrained=true`, which puts RAM on `log(x - lower)` and `logit` coordinates.
 Three of the six parameters have posteriors sitting close to their prior's lower bound, so that transform stretches a left tail the proposal then has to cover.
+
+Holding the sampler fixed and varying only the scale, RAM given a starting scale goes from 177 iterations per effective draw on log/logit to 39 on the constrained parameters, and the empirical-covariance proposal from about 70 to about 35.
+Holding the scale fixed and varying only the adaptation, the two proposals differ by a factor of two and a half on log/logit and are within 10% of each other on the constrained scale.
+So the transform carries most of the difference, the adaptation carries the rest, and the adaptation only matters because the transform made the geometry hard.
+
+That points at a small change rather than a new sampler. Passing `unconstrained=false` to `externalsampler`, with a starting scale for RAM, keeps the session's Turing shape and its sampler and takes 247 iterations per effective draw to 39.
+The starting scale used here was half the posterior standard deviations, which is information you do not have before sampling; whether prior standard deviations serve as well is the obvious next question and was not measured.
 
 Two failure modes are worth keeping in view.
 PMMH at 32 particles looks two and a half times faster than the baseline and returns posterior standard deviations two to three times too narrow, because the log-likelihood estimate has a standard deviation of 6.1 there and the chain sticks on overestimates.

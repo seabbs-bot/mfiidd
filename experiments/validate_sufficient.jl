@@ -78,8 +78,16 @@ println(ok[] ? "  PASS: every rate recovered within 2%" : "  FAIL: a rate is off
 ## from its maximum-likelihood value has to lower the complete-data likelihood,
 ## which checks the algebra in `complete_loglik` against the statistics.
 st = PathStats(
-    (counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7],
-        counts[8]),
+    (
+        counts[1],
+        counts[2],
+        counts[3],
+        counts[4],
+        counts[5],
+        counts[6],
+        counts[7],
+        counts[8],
+    ),
     eb,
     ee,
     ei,
@@ -143,7 +151,6 @@ println("\nDaily incidence against the course simulator over $n_rep replicates")
 @printf("  total mean incidence: statistics %.2f, course %.2f\n", sum(m1), sum(m2))
 @printf("  largest |z| across the %d days: %.2f\n", T, maximum(abs.(z)))
 println(
-    maximum(abs.(z)) < 4 ?
-    "  PASS: the two simulators agree within Monte Carlo error" :
+    maximum(abs.(z)) < 4 ? "  PASS: the two simulators agree within Monte Carlo error" :
     "  FAIL: the incidence distributions differ",
 )

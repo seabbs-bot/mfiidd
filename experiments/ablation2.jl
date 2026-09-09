@@ -25,10 +25,20 @@ runs = [
     ("full cov, RM scale, constrained, seed B", :full, :constrained, nothing, 771),
     ("full cov, RM scale, constrained, seed C", :full, :constrained, nothing, 4242),
     ("full cov, RM scale, log/logit, seed B", :full, :transformed, nothing, 771),
-    ("RAM given a good initial scale, constrained", :ram, :constrained, SD_CONSTRAINED,
-        20260909),
-    ("RAM given a good initial scale, log/logit", :ram, :transformed, SD_TRANSFORMED,
-        20260909),
+    (
+        "RAM given a good initial scale, constrained",
+        :ram,
+        :constrained,
+        SD_CONSTRAINED,
+        20260909,
+    ),
+    (
+        "RAM given a good initial scale, log/logit",
+        :ram,
+        :transformed,
+        SD_TRANSFORMED,
+        20260909,
+    ),
 ]
 
 say("threads: $(Threads.nthreads())")
@@ -40,8 +50,15 @@ obs = flu_observations()
 run_variant(obs; n_warmup = 5, n_iter = 5)
 run_variant(obs; shape = :ram, n_warmup = 5, n_iter = 5)
 
-say("\n", rpad("variant", 46), rpad("s/iter", 10), rpad("worst", 8), rpad("ESS", 9),
-    rpad("iters/eff", 11), "accept")
+say(
+    "\n",
+    rpad("variant", 46),
+    rpad("s/iter", 10),
+    rpad("worst", 8),
+    rpad("ESS", 9),
+    rpad("iters/eff", 11),
+    "accept",
+)
 for (label, shape, transform, S0, seed) in runs
     r = run_variant(obs; shape, transform, initial_S = S0, seed)
     chn = Chains(reshape(r.draws, N_KEPT, 6, 1), PARAMETERS)

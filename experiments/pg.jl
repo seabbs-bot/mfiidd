@@ -53,8 +53,15 @@ function (c::PathCallback)(model, filter, state, data, ::PostInitCallback; kwarg
     return nothing
 end
 
-function (c::PathCallback)(model, filter, step, state, data, ::PostUpdateCallback;
-    kwargs...)
+function (c::PathCallback)(
+    model,
+    filter,
+    step,
+    state,
+    data,
+    ::PostUpdateCallback;
+    kwargs...,
+)
     push!(c.states, getfield.(state.particles, :state))
     push!(c.ancestors, getfield.(state.particles, :ancestor))
     return nothing
@@ -100,14 +107,8 @@ function csmc_path(rng, θ, obs, n_particles, ref; threaded = true)
     algo = threaded ? ThreadedBF(BF(n_particles)) : BF(n_particles)
     cb = PathCallback()
 
-    final, ll = GeneralisedFilters.filter(
-        rng,
-        model,
-        algo,
-        obs;
-        ref_state = ref,
-        callback = cb,
-    )
+    final, ll =
+        GeneralisedFilters.filter(rng, model, algo, obs; ref_state = ref, callback = cb)
 
     log_w = getfield.(final.particles, :log_w)
     w = exp.(log_w .- maximum(log_w))
@@ -151,8 +152,7 @@ to_constrained(u) = Dict{Symbol, Float64}(
     :ρ => logistic(u[6]),
 )
 
-log_jacobian(u) =
-    u[1] + u[2] + u[3] + u[5] + log_dlogistic(u[4]) + log_dlogistic(u[6])
+log_jacobian(u) = u[1] + u[2] + u[3] + u[5] + log_dlogistic(u[4]) + log_dlogistic(u[6])
 
 """
     log_target(u, st)
@@ -192,8 +192,7 @@ mutable struct ThetaStep
     proposed::Int
 end
 
-ThetaStep(d::Int) =
-    ThetaStep(zeros(d), zeros(d, d), 0, log(2.38^2 / d) / 2, 0, 0)
+ThetaStep(d::Int) = ThetaStep(zeros(d), zeros(d, d), 0, log(2.38^2 / d) / 2, 0, 0)
 
 function observe!(s::ThetaStep, u)
     s.count += 1

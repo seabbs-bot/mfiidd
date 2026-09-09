@@ -38,3 +38,21 @@ D_inf    mean    2.107   sd   0.828   95% [0.668, 3.847]
 α        mean    0.473   sd   0.054   95% [0.359, 0.574]
 D_imm    mean    11.86   sd   1.798   95% [8.451, 15.46]
 ρ        mean    0.695   sd   0.047   95% [0.608, 0.793]
+RAM given a good initial scale, log/logit     0.00500   D_lat   170.0    176.5      24.0%
+
+RAM given a good initial scale, log/logit posterior:
+R_0      mean    6.334   sd   1.196   95% [4.204, 8.884]
+D_lat    mean    1.341   sd   0.415   95% [0.558, 2.156]
+D_inf    mean    2.118   sd   0.842   95% [0.715, 3.896]
+α        mean    0.472   sd   0.057   95% [0.347, 0.574]
+D_imm    mean   11.751   sd   1.779   95% [8.523, 15.493]
+ρ        mean    0.694   sd   0.049   95% [0.6, 0.789]
+  Activating project at `~/code/external/mfiidd/.claude/worktrees/agent-ab7b8e938bf30f288`
+
+committed PMMH chain posterior:
+R_0      mean    6.358   sd   1.166   95% [4.283, 8.876]
+D_lat    mean    1.331   sd   0.412   95% [0.592, 2.152]
+D_inf    mean    2.143   sd   0.809   95% [0.742, 3.832]
+α        mean    0.472   sd   0.056   95% [0.357, 0.576]
+D_imm    mean   11.769   sd   1.802   95% [8.425, 15.538]
+ρ        mean    0.693   sd   0.048   95% [0.602, 0.789]

@@ -35,8 +35,15 @@ variants = [
 ]
 
 results = []
-say("\n", rpad("variant", 46), rpad("s/iter", 10), rpad("worst", 8), rpad("ESS", 9),
-    rpad("iters/eff", 11), "accept")
+say(
+    "\n",
+    rpad("variant", 46),
+    rpad("s/iter", 10),
+    rpad("worst", 8),
+    rpad("ESS", 9),
+    rpad("iters/eff", 11),
+    "accept",
+)
 for (label, shape, transform, freeze) in variants
     r = run_variant(obs; shape, transform, freeze_after_warmup = freeze)
     chn = Chains(reshape(r.draws, N_KEPT, 6, 1), PARAMETERS)

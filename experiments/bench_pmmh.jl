@@ -44,8 +44,14 @@ end
 obs = flu_observations()
 
 ## one short run first, so the timed run measures sampling rather than compilation
-sample(pmmh(obs, N_PARTICLES), externalsampler(AdvancedMH.RobustAdaptiveMetropolis()),
-    20; num_warmup = 10, check_model = false, progress = false)
+sample(
+    pmmh(obs, N_PARTICLES),
+    externalsampler(AdvancedMH.RobustAdaptiveMetropolis()),
+    20;
+    num_warmup = 10,
+    check_model = false,
+    progress = false,
+)
 
 println("threads: $(Threads.nthreads())")
 println("particles: $N_PARTICLES, warmup: $n_warmup, samples: $n_samples")

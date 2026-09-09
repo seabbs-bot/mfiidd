@@ -42,8 +42,14 @@ end
 
 ## ------------------------------ 1. does the parameter step limit the sampler
 say("\nparticle Gibbs, 128 particles, 8000 iterations, varying parameter steps")
-say(rpad("θ steps", 10), rpad("s/iter", 10), rpad("worst", 8), rpad("ESS", 10),
-    rpad("ESS/s", 10), "accept")
+say(
+    rpad("θ steps", 10),
+    rpad("s/iter", 10),
+    rpad("worst", 8),
+    rpad("ESS", 10),
+    rpad("ESS/s", 10),
+    "accept",
+)
 for n_theta in (1, 10, 200, 1000)
     r = particle_gibbs(
         obs;
@@ -67,8 +73,14 @@ end
 
 ## ------------------------------------- 2. what makes the PMMH parameter step work
 say("\nPMMH variants, 40000 iterations")
-say(rpad("variant", 46), rpad("s/iter", 10), rpad("worst", 8), rpad("ESS", 10),
-    rpad("ESS/s", 10), "min to 400")
+say(
+    rpad("variant", 46),
+    rpad("s/iter", 10),
+    rpad("worst", 8),
+    rpad("ESS", 10),
+    rpad("ESS/s", 10),
+    "min to 400",
+)
 
 for (label, N, seed, freeze) in (
     ("128 particles, keeps adapting, seed A", 128, 20260909, false),

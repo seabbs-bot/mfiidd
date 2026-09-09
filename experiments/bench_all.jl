@@ -138,8 +138,13 @@ posterior_table(committed_chain(), "committed PMMH chain")
 say("\n\n", "="^88)
 say("SUMMARY (worst-mixing parameter)")
 say("="^88)
-say(rpad("sampler", 46), rpad("s/iter", 10), rpad("worst", 8), rpad("ESS/s", 10),
-    "min to ESS 400")
+say(
+    rpad("sampler", 46),
+    rpad("s/iter", 10),
+    rpad("worst", 8),
+    rpad("ESS/s", 10),
+    "min to ESS 400",
+)
 for r in summary_rows
     @printf(
         "%-46s%-10.5f%-8s%-10.4f%.1f\n",

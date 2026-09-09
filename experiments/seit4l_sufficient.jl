@@ -218,8 +218,16 @@ function path_stats(path, obs)
     end
 
     return PathStats(
-        (counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7],
-            counts[8]),
+        (
+            counts[1],
+            counts[2],
+            counts[3],
+            counts[4],
+            counts[5],
+            counts[6],
+            counts[7],
+            counts[8],
+        ),
         eb,
         ee,
         ei,
@@ -253,10 +261,9 @@ function complete_loglik(θ, st::PathStats)
     n = st.n
     n_tau = n[4] + n[5] + n[6] + n[7] + n[8]
 
-    return n[1] * log(β) - β * st.exp_beta +
-           n[2] * log(ϵ) - ϵ * st.exp_E +
-           n[3] * log(ν) - ν * st.exp_I +
-           n_tau * log(τ) - τ * st.exp_T +
-           n[7] * log1p(-α) + n[8] * log(α) +
+    return n[1] * log(β) - β * st.exp_beta + n[2] * log(ϵ) - ϵ * st.exp_E + n[3] * log(ν) -
+           ν * st.exp_I + n_tau * log(τ) - τ * st.exp_T +
+           n[7] * log1p(-α) +
+           n[8] * log(α) +
            st.obs_cases * log(ρ) - ρ * st.obs_inc
 end

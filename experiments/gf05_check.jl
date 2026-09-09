@@ -49,8 +49,8 @@ say("\n1. the course's own filter code under 0.5")
 try
     Random.seed!(1)
     lls = [
-        run_particle_filter(θ, obs, 128; init_state = INIT_STATE, threaded = false)
-        for _ in 1:30
+        run_particle_filter(θ, obs, 128; init_state = INIT_STATE, threaded = false) for
+        _ in 1:30
     ]
     @printf("  plain bootstrap filter: mean %.2f, sd %.2f  OK\n", mean(lls), std(lls))
 catch e
@@ -60,8 +60,8 @@ end
 try
     Random.seed!(1)
     lls = [
-        run_particle_filter(θ, obs, 128; init_state = INIT_STATE, threaded = true)
-        for _ in 1:30
+        run_particle_filter(θ, obs, 128; init_state = INIT_STATE, threaded = true) for
+        _ in 1:30
     ]
     @printf(
         "  ThreadedBF (overrides predict): mean %.2f, sd %.2f  OK\n",
@@ -130,8 +130,10 @@ for (name, refresh) in (
         algo = GeneralisedFilters.ConditionalSMC(GeneralisedFilters.BF(128), refresh)
         _, st = AbstractMCMC.step(Random.default_rng(), csmc_model, algo)
         _, st = AbstractMCMC.step(Random.default_rng(), csmc_model, algo, st)
-        say("  it ran. That is unexpected; the sampler needs a transition density ",
-            "these dynamics cannot evaluate, so check what it actually called.")
+        say(
+            "  it ran. That is unexpected; the sampler needs a transition density ",
+            "these dynamics cannot evaluate, so check what it actually called.",
+        )
     catch e
         msg = sprint(showerror, e)
         say("  failed as expected, with:")

@@ -43,18 +43,11 @@ function target_at(v, transform, obs, n_particles)
     end
     lp = log_prior(θ)
     isfinite(lp) || return -Inf, θ
-    ll = run_particle_filter(
-        θ,
-        obs,
-        n_particles;
-        init_state = INIT_STATE,
-        threaded = true,
-    )
+    ll = run_particle_filter(θ, obs, n_particles; init_state = INIT_STATE, threaded = true)
     return lp + lj + ll, θ
 end
 
-start_vector(transform, θ) =
-    transform === :transformed ? to_unconstrained(θ) : θ_vec(θ)
+start_vector(transform, θ) = transform === :transformed ? to_unconstrained(θ) : θ_vec(θ)
 
 ## ------------------------------------------------------------------ RAM proposal
 
@@ -161,4 +154,3 @@ function run_variant(
 
     return (draws = draws, elapsed = time() - t_start, accept = moved / n_iter)
 end
-
