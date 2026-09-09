@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Choosing a particle sampler</title>
+<style>
+  :root{
+    --fc:#4f46e5;     /* the filter and its estimate / primary */
+    --obs:#0891b2;    /* weights and effective sample size */
+    --miss:#f59e0b;   /* particles */
+    --now:#dc2626;    /* the data */
+    --true:#64748b;   /* the true latent path */
+    --ink:#1f2933;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --bg:#fbfbfd;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  .wrap{max-width:1340px; margin:0 auto; padding:0 22px 120px}
+  .prose{max-width:78ch}
+  header.hero{
+    padding:54px 22px 30px; text-align:center;
+    background:linear-gradient(180deg,#eef2ff 0%, var(--bg) 100%);
+    border-bottom:1px solid var(--line);
+  }
+  header.hero h1{font-size:30px; margin:0 0 8px; letter-spacing:-.4px}
+  header.hero p{max-width:710px; margin:0 auto; color:var(--muted)}
+  nav.toc{
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:center;
+    margin:22px auto 0; max-width:780px;
+  }
+  nav.toc a{
+    text-decoration:none; color:var(--fc); font-weight:600; font-size:14px;
+    border:1px solid #c7d2fe; background:#fff; padding:6px 13px; border-radius:999px;
+  }
+  nav.toc a:hover{background:#eef2ff}
+  section{
+    scroll-margin-top:84px;
+    background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:26px 28px; margin:30px 0; box-shadow:0 1px 2px rgba(15,23,42,.04);
+  }
+  section > h2{margin:0 0 4px; font-size:23px; letter-spacing:-.3px}
+  .tagline{color:var(--muted); margin:0 0 18px; font-size:15px}
+  h3{margin:26px 0 8px; font-size:17px}
+  p{margin:10px 0}
+  .fig{
+    border:1px solid var(--line); border-radius:12px; padding:16px 14px 10px;
+    margin:18px 0 6px; background:#fff;
+  }
+  .fig svg{display:block; width:100%; height:auto}
+  .figcap{font-size:13.5px; color:var(--muted); margin:8px 4px 2px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:760px){ .grid2{grid-template-columns:1fr} }
+  /* the day axis on the left, the day being filtered on the right */
+  .cols{display:grid; grid-template-columns:1.32fr 1fr; gap:18px; align-items:start}
+  .cols > div > .fig:first-child{margin-top:0}
+  @media (max-width:1040px){ .cols{grid-template-columns:1fr} }
+  .colhead{font-size:13px; font-weight:700; color:var(--muted); margin:2px 4px -6px;
+           text-transform:uppercase; letter-spacing:.04em}
+  .controls{
+    display:flex; flex-wrap:wrap; gap:16px 26px; align-items:center;
+    margin:8px 4px 2px; padding:12px 14px; background:#f8fafc;
+    border:1px solid var(--line); border-radius:10px; font-size:14px;
+  }
+  .controls label{display:flex; flex-direction:column; gap:2px; min-width:160px}
+  .controls .vlabel{font-weight:600}
+  .controls input[type=range]{width:170px; accent-color:var(--fc)}
+  .controls .check{flex-direction:row; align-items:center; gap:8px; min-width:0}
+  .readout{
+    display:flex; gap:10px; flex-wrap:wrap; margin:12px 4px 0;
+    font-variant-numeric:tabular-nums;
+  }
+  .readout .chip{
+    background:#f1f5f9; border:1px solid var(--line); border-radius:8px;
+    padding:6px 12px; font-size:13.5px; color:var(--muted);
+  }
+  .readout .chip b{font-size:16px; color:var(--ink); display:block; font-weight:700}
+  .stage{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:14px 4px 0}
+  .stage button{
+    font:600 13.5px inherit; border:1px solid var(--fc); background:var(--fc);
+    color:#fff; padding:8px 16px; border-radius:8px; cursor:pointer;
+  }
+  .stage button.ghost{background:#fff; color:var(--fc)}
+  .stage button:disabled{opacity:.4; cursor:default}
+  .steps{display:flex; gap:6px; flex-wrap:wrap; margin:12px 4px 0; font-size:13px}
+  .steps span{padding:4px 11px; border-radius:999px; border:1px solid var(--line); color:var(--muted)}
+  .steps span.on{background:var(--fc); color:#fff; border-color:var(--fc)}
+  .presets{display:flex; gap:8px; flex-wrap:wrap; margin:14px 4px 0; align-items:center}
+  .presets button{
+    font:600 13px inherit; border:1px solid #c7d2fe; background:#fff; color:var(--fc);
+    padding:6px 13px; border-radius:8px; cursor:pointer;
+  }
+  .presets button:hover{background:#eef2ff}
+  .presets .plabel{font-size:13.5px; color:var(--muted); align-self:center}
+  .obsbar{
+    position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:14px 24px;
+    align-items:center; margin:22px 0 0; padding:12px 16px; background:#f8fafc;
+    border:1px solid var(--line); border-radius:12px; font-size:14px;
+    box-shadow:0 2px 6px rgba(15,23,42,.05);
+  }
+  .obsbar .obslab{font-weight:700}
+  .obsbar label{display:flex; align-items:center; gap:7px}
+  .obsbar .slide{flex-direction:column; align-items:flex-start; gap:2px}
+  .obsbar input[type=range]{width:150px; accent-color:var(--fc)}
+  .obsbar .hint{color:var(--muted); font-size:13px}
+  .prog{height:6px; background:#eef2f7; border-radius:999px; overflow:hidden; margin:12px 4px 0}
+  .prog i{display:block; height:100%; width:0; background:var(--fc)}
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:13.5px; margin:4px 4px 8px}
+  .legend span{display:inline-flex; align-items:center; gap:7px}
+  .swatch{width:22px; height:0; border-top-width:3px; border-top-style:solid; display:inline-block}
+  .swbox{width:16px; height:14px; border-radius:3px; display:inline-block; vertical-align:middle}
+  .key{background:#ecfeff; border-left:4px solid var(--obs); padding:12px 16px; border-radius:0 8px 8px 0; margin:16px 0}
+  .key.amber{background:#fffbeb; border-color:var(--miss)}
+  .key.blue{background:#eef2ff; border-color:var(--fc)}
+  .key.red{background:#fef2f2; border-color:var(--now)}
+  .turn{background:#f5f3ff; border-left:4px solid var(--fc); padding:12px 16px 14px; border-radius:0 8px 8px 0; margin:18px 0}
+  .turn h4{margin:0 0 4px; font-size:15px}
+  .turn ol{margin:6px 0 0; padding-left:20px}
+  .turn li{font-size:15px}
+  .formula{
+    background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 18px;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    font-size:15px; overflow-x:auto; margin:14px 0; line-height:2.1;
+  }
+  .formula .obs{color:#5eead4} .formula .miss{color:#fcd34d} .formula .tot{color:#a5b4fc}
+  ul{margin:10px 0; padding-left:22px}
+  li{margin:5px 0}
+  code{background:#f1f5f9; padding:1px 6px; border-radius:5px; font-size:14px}
+  details{border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin:10px 0; background:#fff}
+  details[open]{background:#fcfdff}
+  summary{font-weight:600; cursor:pointer}
+  details p{margin:8px 0 2px; font-size:15px}
+  footer{text-align:center; color:var(--muted); font-size:13px; margin-top:40px}
+  a{color:var(--fc)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <h1>Choosing a particle sampler</h1>
+  <p>Particle MCMC is not one algorithm.
+  The filter, the thing the sampler conditions on, and the thing it integrates out are three separate choices, and most named methods are one combination of them.
+  This page draws each scheme step by step and says whether it would work for the SEIT4L model of the practical, and what you would have to write to try it.</p>
+  <nav class="toc">
+    <a href="#axes">Three choices</a>
+    <a href="#pmmh">PMMH</a>
+    <a href="#pg">Particle Gibbs</a>
+    <a href="#pgas">Ancestor sampling</a>
+    <a href="#smc2">SMC²</a>
+    <a href="#filters">Better filters</a>
+    <a href="#table">What would work here</a>
+  </nav>
+</header>
+
+<div class="wrap">
+
+<!-- ============ THE THREE CHOICES ============ -->
+<section id="axes">
+  <h2>Three choices, not one algorithm</h2>
+  <p class="tagline">Most of the names are a combination of these</p>
+  <div class="prose">
+    <p><b>How the filter proposes.</b> The bootstrap filter simulates from the model and ignores the data until it weights. A guided or auxiliary filter looks at the day's count first and proposes towards it. This changes how many particles you need, not what the sampler targets.</p>
+    <p><b>What the sampler conditions on.</b> PMMH updates the parameters and throws the path away. Particle Gibbs keeps a path, updates the parameters given it, and then updates the path given the parameters. One sees the filter's noise in its acceptance ratio, the other does not.</p>
+    <p><b>What is integrated out.</b> If part of the state is conditionally linear and Gaussian, a Kalman filter can handle that part exactly and the particles only carry the rest. SEIT4L has no such part, which is why one family below does not apply.</p>
+  </div>
+</section>
+
+<!-- ============ PMMH ============ -->
+<section id="pmmh">
+  <h2>Particle marginal Metropolis-Hastings</h2>
+  <p class="tagline">What the practical runs</p>
+  <div class="fig">
+    <svg id="d1" viewBox="0 0 1120 300" role="img" aria-label="Schematic of one PMMH iteration: propose parameters, run a particle filter to estimate the likelihood, compare with the estimate stored for the current state, accept or reject."></svg>
+  </div>
+  <div class="stage">
+    <button data-diag="d1" data-act="step">Next step</button>
+    <button data-diag="d1" data-act="reset" class="ghost">Reset</button>
+    <span class="plabel" id="d1cap" style="font-size:14px; color:var(--ink)"></span>
+  </div>
+  <div class="prose key blue">Works here, and is what the committed chains use.
+  The cost is the one the sampler page shows: the acceptance ratio carries the filter's noise, so the chain sticks, and the particle count has to be calibrated to control it.</div>
+</section>
+
+<!-- ============ PARTICLE GIBBS ============ -->
+<section id="pg">
+  <h2>Particle Gibbs</h2>
+  <p class="tagline">Keep a path, and update the parameters given it</p>
+  <div class="fig">
+    <svg id="d2" viewBox="0 0 1120 320" role="img" aria-label="Schematic of one particle Gibbs iteration: a conditional filter run in which one particle is forced to follow the reference path, a new path drawn from the survivors, and a parameter update conditioned on that path."></svg>
+  </div>
+  <div class="stage">
+    <button data-diag="d2" data-act="step">Next step</button>
+    <button data-diag="d2" data-act="reset" class="ghost">Reset</button>
+    <span class="plabel" id="d2cap" style="font-size:14px; color:var(--ink)"></span>
+  </div>
+  <div class="prose key">Would work here, and the parameter step is the attraction.
+  Given a complete path the SEIT4L likelihood is available in closed form: for a continuous-time Markov chain it is a product over transitions of the rate that fired, times the exponential of the total hazard integrated over the time spent in each state.
+  Both are read off a Gillespie path directly, because the simulator already knows every event time and every waiting time.
+  So the parameter update sees no filter noise at all.</div>
+  <div class="prose key amber">The catch is the path step. Plain particle Gibbs inherits the collapse the filter page draws: the new path shares its early history with the old one, so the early parameters barely move.
+  This is what ancestor sampling exists to fix.</div>
+</section>
+
+<!-- ============ PGAS ============ -->
+<section id="pgas">
+  <h2>Ancestor sampling</h2>
+  <p class="tagline">Repair the reference path's past instead of copying it</p>
+  <div class="fig">
+    <svg id="d3" viewBox="0 0 1120 300" role="img" aria-label="Schematic of ancestor sampling: at each step the reference particle is given a new ancestor drawn in proportion to the weight of each candidate times the probability of moving from that candidate to the reference state."></svg>
+  </div>
+  <div class="stage">
+    <button data-diag="d3" data-act="step">Next step</button>
+    <button data-diag="d3" data-act="reset" class="ghost">Reset</button>
+    <span class="plabel" id="d3cap" style="font-size:14px; color:var(--ink)"></span>
+  </div>
+  <div class="prose key red">This is the one that does not work with the model as it stands, and the reason is worth understanding.
+  Drawing a new ancestor needs the probability of moving from each candidate state to the reference state in one day.
+  The Gillespie simulator can draw from that distribution but cannot evaluate it: the day's transition density of a continuous-time Markov chain is a matrix exponential over a state space of every compartment combination.
+  Backward simulation needs the same quantity.
+  A tau-leaping or binomial-transition version of the model would supply it, at the cost of simulating an approximation.</div>
+</section>
+
+<!-- ============ SMC2 ============ -->
+<section id="smc2">
+  <h2>SMC²</h2>
+  <p class="tagline">A cloud of parameter values, each carrying its own filter</p>
+  <div class="fig">
+    <svg id="d4" viewBox="0 0 1120 320" role="img" aria-label="Schematic of SMC squared: a population of parameter particles, each with its own particle filter, reweighted as each day of data arrives, resampled and moved with a PMMH kernel when the parameter cloud degenerates."></svg>
+  </div>
+  <div class="stage">
+    <button data-diag="d4" data-act="step">Next step</button>
+    <button data-diag="d4" data-act="reset" class="ghost">Reset</button>
+    <span class="plabel" id="d4cap" style="font-size:14px; color:var(--ink)"></span>
+  </div>
+  <div class="prose key">Would work here, needs no density the model cannot supply, and is the one that suits a many-core machine.
+  Each parameter particle carries an independent filter, so the work spreads across cores with no synchronisation until the parameter cloud is resampled.
+  It also gives the marginal likelihood as it goes, which is what model comparison between SEITL and SEIT4L wants.
+  Nothing in the course stack implements it, so this is the largest build of the four.</div>
+</section>
+
+<!-- ============ FILTER-LEVEL CHOICES ============ -->
+<section id="filters">
+  <h2>Better filters, same sampler</h2>
+  <p class="tagline">Changing the proposal inside the filter changes the particle count, not the target</p>
+  <div class="fig">
+    <svg id="d5" viewBox="0 0 1120 280" role="img" aria-label="Schematic contrasting a bootstrap proposal, which simulates from the model and then weights, with a guided proposal, which looks at the day's count before proposing, and an auxiliary filter, which resamples on a lookahead weight first."></svg>
+  </div>
+  <div class="stage">
+    <button data-diag="d5" data-act="step">Next step</button>
+    <button data-diag="d5" data-act="reset" class="ghost">Reset</button>
+    <span class="plabel" id="d5cap" style="font-size:14px; color:var(--ink)"></span>
+  </div>
+  <div class="prose">
+    <p>Both a guided proposal and the auxiliary filter need something the bootstrap filter does not: a way to score a state against the coming observation before simulating, and a proposal density to divide by.
+    For SEIT4L you would build both from a deterministic one-day prediction, which is extra code and extra approximation, in exchange for needing fewer particles.
+    Neither changes what the sampler targets, so neither is a source of bias.</p>
+    <p>The Rao-Blackwellised filter is the other member of this family and does not apply.
+    It integrates out a part of the state that is linear and Gaussian given the rest, and SEIT4L has no such part.</p>
+  </div>
+</section>
+
+<!-- ============ THE TABLE ============ -->
+<section id="table">
+  <h2>What would work here</h2>
+  <p class="tagline">Checked against the versions this course pins</p>
+  <table>
+    <thead><tr><th>Scheme</th><th>In GeneralisedFilters</th><th>Works for SEIT4L</th><th>What it would take</th></tr></thead>
+    <tbody>
+      <tr><td><b>PMMH</b>, bootstrap filter</td><td><code>BF(N)</code>, used through Turing</td><td>Yes, this is the course</td><td>Nothing. Calibrate the particle count.</td></tr>
+      <tr><td><b>Particle Gibbs</b></td><td><code>ConditionalSMC(BF(N))</code></td><td>Yes</td><td>The parameter update from a complete path. The rate and exposure sums come off a Gillespie path, so this is arithmetic rather than approximation.</td></tr>
+      <tr><td><b>Ancestor sampling</b>, PGAS</td><td><code>ConditionalSMC(BF(N), AncestorSampling())</code></td><td>No, not as the model stands</td><td>A one-day transition density. Gillespie can sample it and not evaluate it. Tau-leaping would supply one.</td></tr>
+      <tr><td><b>Backward simulation</b></td><td><code>ConditionalSMC(BF(N), BackwardSimulation())</code></td><td>No, same reason</td><td>Same transition density.</td></tr>
+      <tr><td><b>Auxiliary filter</b></td><td><code>APF</code></td><td>Yes, with work</td><td>A lookahead weight: how plausible tomorrow's count is from today's state.</td></tr>
+      <tr><td><b>Guided proposal</b></td><td><code>PF(N, proposal)</code></td><td>Yes, with work</td><td>A proposal that uses the day's count, and its density to divide by.</td></tr>
+      <tr><td><b>Rao-Blackwellised</b></td><td><code>RBPF(BF(N), KF())</code></td><td>No</td><td>Nothing to integrate out. SEIT4L has no conditionally linear Gaussian part.</td></tr>
+      <tr><td><b>SMC²</b></td><td>Not provided</td><td>Yes</td><td>Building it. Parallelises across parameter particles and returns the marginal likelihood.</td></tr>
+    </tbody>
+  </table>
+  <p class="figcap">GPU work exists as well, in the package's CUDA extension. It resamples on the device and expects the particles in one array, which suits a fixed-step simulator and not a per-particle Gillespie loop.</p>
+
+  <div class="prose key blue">If you want one thing to try next, try particle Gibbs.
+  It is supported by the stack as it stands, the parameter update is exact arithmetic on a path you already simulate, and it removes the filter's noise from the parameter step rather than calibrating around it.
+  Check the path step for the collapse the filter page draws before trusting the early parameters.</div>
+</section>
+
+
+<footer>Built as a teaching aid for the MFIIDD particle MCMC session.
+The verdicts are checked against the versions this course pins: GeneralisedFilters and SSMProblems as they are in the project manifest.
+The model throughout is SEIT4L simulated by the Gillespie algorithm, fitted to the Tristan da Cunha influenza outbreak of 1971.</footer>
+
+</div>
+
+<script>/* ================= a small player for the schematics =================
+   Each diagram is a set of boxes and arrows plus an ordered list of steps.
+   A step says which boxes and arrows are lit, and what the caption reads, so
+   the reader walks the algorithm rather than reading a static picture. */
+var SVGNS="http://www.w3.org/2000/svg";
+function el(tag,attrs){ var e=document.createElementNS(SVGNS,tag);
+  for(var k in attrs) e.setAttribute(k,attrs[k]); return e; }
+function add(svg,tag,attrs){ var e=el(tag,attrs); svg.appendChild(e); return e; }
+function clear(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+function tx(svg,attrs,s){ var e=el("text",attrs); e.textContent=s; svg.appendChild(e); return e; }
+var C={fc:"#4f46e5", w:"#0891b2", part:"#f59e0b", data:"#dc2626", grey:"#94a3b8",
+       ink:"#1f2933", mute:"#6b7280", line:"#e5e7eb"};
+
+function wrapText(svg,x,y,w,s,size,fill,weight){
+  var words=s.split(" "), line="", lines=[], i;
+  var per=Math.max(6,Math.floor(w/(size*0.52)));
+  for(i=0;i<words.length;i++){
+    var t=line?line+" "+words[i]:words[i];
+    if(t.length>per){ lines.push(line); line=words[i]; } else line=t;
+  }
+  if(line) lines.push(line);
+  for(i=0;i<lines.length;i++)
+    tx(svg,{x:x,y:y+i*(size+3),"font-size":size,fill:fill,"text-anchor":"middle",
+            "font-weight":weight||400},lines[i]);
+  return lines.length;
+}
+
+function drawDiagram(svg,spec,step){
+  clear(svg);
+  var on={}, arrowOn={}, i;
+  var st=spec.steps[Math.min(step,spec.steps.length-1)];
+  for(i=0;i<spec.steps.length && i<=step;i++){
+    (spec.steps[i].boxes||[]).forEach(function(b){ on[b]=(i===step)?2:1; });
+    (spec.steps[i].arrows||[]).forEach(function(a){ arrowOn[a]=(i===step)?2:1; });
+  }
+  add(svg,"defs",{}).appendChild((function(){
+    var m=el("marker",{id:"ah",viewBox:"0 0 10 10",refX:9,refY:5,markerWidth:6,
+      markerHeight:6,orient:"auto-start-reverse"});
+    m.appendChild(el("path",{d:"M0 0L10 5L0 10z",fill:C.grey}));
+    return m;
+  })());
+  var byId={};
+  spec.boxes.forEach(function(b){ byId[b.id]=b; });
+  spec.arrows.forEach(function(a){
+    var f=byId[a.from], t=byId[a.to], lit=arrowOn[a.id]||0;
+    var x1=f.x+f.w, y1=f.y+f.h/2, x2=t.x, y2=t.y+t.h/2, d;
+    if(a.down){ x1=f.x+f.w/2; y1=f.y+f.h; x2=t.x+t.w/2; y2=t.y;
+      d="M"+x1+" "+y1+"L"+x2+" "+y2; }
+    else if(a.back){ x1=f.x+f.w/2; y1=f.y+f.h; x2=t.x+t.w/2; y2=t.y+t.h;
+      d="M"+x1+" "+y1+"C"+x1+" "+(y1+52)+" "+x2+" "+(y2+52)+" "+x2+" "+y2; }
+    else d="M"+x1+" "+y1+"L"+x2+" "+y2;
+    add(svg,"path",{d:d,fill:"none",stroke:lit===2?C.fc:(lit?C.grey:"#e2e8f0"),
+      "stroke-width":lit===2?2.4:1.6,"marker-end":"url(#ah)",
+      "stroke-dasharray":a.dash?"5 4":"none"});
+    if(a.label)
+      tx(svg,{x:(x1+x2)/2,y:(y1+y2)/2-(a.back?-46:8),"font-size":11.5,
+              fill:lit?C.mute:"#cbd5e1","text-anchor":"middle"},a.label);
+  });
+  spec.boxes.forEach(function(b){
+    var lit=on[b.id]||0;
+    var fill=lit===2?"#eef2ff":(lit?"#ffffff":"#fbfbfd");
+    var stroke=lit===2?C.fc:(lit?C.grey:"#e2e8f0");
+    add(svg,"rect",{x:b.x,y:b.y,width:b.w,height:b.h,rx:11,fill:fill,stroke:stroke,
+                    "stroke-width":lit===2?2.2:1.2});
+    var cy=b.y+(b.sub?b.h/2-6:b.h/2+4);
+    wrapText(svg,b.x+b.w/2,cy,b.w-16,b.label,13,lit?C.ink:"#9ca3af",700);
+    if(b.sub) wrapText(svg,b.x+b.w/2,b.y+b.h/2+14,b.w-14,b.sub,11.5,lit?C.mute:"#cbd5e1");
+  });
+  (st.marks||[]).forEach(function(m){ m(svg); });
+  return st.text;
+}
+
+function player(id,spec){
+  var svg=document.getElementById(id), cap=document.getElementById(id+"cap"), step=0;
+  function show(){ cap.textContent=(step+1)+" of "+spec.steps.length+". "+drawDiagram(svg,spec,step); }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-diag="'+id+'"]'),function(b){
+    b.addEventListener("click",function(){
+      if(b.getAttribute("data-act")==="reset") step=0;
+      else step=(step+1)%spec.steps.length;
+      show();
+    });
+  });
+  show();
+}
+
+/* ---------- PMMH ---------- */
+player("d1",{
+  boxes:[
+    {id:"cur",x:40,y:110,w:170,h:78,label:"current θ",sub:"and the estimate stored with it"},
+    {id:"prop",x:270,y:30,w:170,h:70,label:"proposed θ′",sub:"a random walk step"},
+    {id:"filt",x:500,y:30,w:210,h:70,label:"particle filter",sub:"J particles, one run"},
+    {id:"lhat",x:770,y:30,w:170,h:70,label:"log L̂(θ′)",sub:"a draw, not a value"},
+    {id:"acc",x:770,y:150,w:170,h:78,label:"accept or reject",sub:"compare with the stored estimate"},
+    {id:"keep",x:500,y:150,w:210,h:78,label:"keep the estimate",sub:"the accepted draw is stored, not recomputed"}
+  ],
+  arrows:[
+    {id:"a1",from:"cur",to:"prop"},{id:"a2",from:"prop",to:"filt"},
+    {id:"a3",from:"filt",to:"lhat"},{id:"a4",from:"lhat",to:"acc",down:true},
+    {id:"a5",from:"acc",to:"keep"},{id:"a6",from:"keep",to:"cur",label:"next iteration"}
+  ],
+  steps:[
+    {boxes:["cur"],arrows:[],text:"The chain holds a parameter set and, with it, the likelihood estimate that was accepted alongside it."},
+    {boxes:["prop"],arrows:["a1"],text:"Propose a new parameter set with a random walk."},
+    {boxes:["filt","lhat"],arrows:["a2","a3"],text:"Run the filter once at the proposal. The number it returns is one draw from a distribution, not the likelihood."},
+    {boxes:["acc"],arrows:["a4"],text:"Compare the fresh draw with the stored one. That comparison is what carries the filter's noise into the sampler."},
+    {boxes:["keep"],arrows:["a5","a6"],text:"An accepted proposal brings its estimate with it, and that estimate is never refreshed. A lucky one is what a plateau is made of."}
+  ]
+});
+
+/* ---------- particle Gibbs ---------- */
+player("d2",{
+  boxes:[
+    {id:"ref",x:40,y:120,w:180,h:80,label:"reference path x*",sub:"kept from the last iteration"},
+    {id:"csmc",x:280,y:40,w:230,h:90,label:"conditional filter",sub:"J−1 free particles, one forced to follow x*"},
+    {id:"draw",x:570,y:40,w:180,h:90,label:"draw a new path",sub:"in proportion to the final weights"},
+    {id:"theta",x:810,y:40,w:250,h:90,label:"update θ given the path",sub:"exact: rates that fired, and time at risk"},
+    {id:"loop",x:570,y:190,w:180,h:70,label:"new reference",sub:"the drawn path"}
+  ],
+  arrows:[
+    {id:"b1",from:"ref",to:"csmc"},{id:"b2",from:"csmc",to:"draw"},
+    {id:"b3",from:"draw",to:"theta"},{id:"b4",from:"draw",to:"loop",down:true},
+    {id:"b5",from:"loop",to:"ref",label:"next iteration"}
+  ],
+  steps:[
+    {boxes:["ref"],arrows:[],text:"The state of the sampler is a whole trajectory, not just a parameter set."},
+    {boxes:["csmc"],arrows:["b1"],text:"Run the filter with one particle pinned to the reference path, so the old trajectory always survives and the invariance holds."},
+    {boxes:["draw"],arrows:["b2"],text:"Draw one trajectory from the final weights. Sometimes it is the reference, usually it is a fresh one."},
+    {boxes:["theta"],arrows:["b3"],text:"Update the parameters given that complete path. For a Markov jump process this is exact arithmetic: count the transitions of each type and add up the time spent at risk. No filter noise enters here."},
+    {boxes:["loop"],arrows:["b4","b5"],text:"The drawn path becomes the next reference. What limits this scheme is how different that path is from the old one."}
+  ]
+});
+
+/* ---------- ancestor sampling ---------- */
+player("d3",{
+  boxes:[
+    {id:"cand",x:60,y:60,w:210,h:90,label:"candidate particles at day t−1",sub:"each with its weight"},
+    {id:"refp",x:60,y:190,w:210,h:70,label:"reference state at day t",sub:"fixed by x*"},
+    {id:"score",x:340,y:110,w:260,h:100,label:"score every candidate",sub:"weight × probability of moving from it to the reference state in one day"},
+    {id:"pick",x:670,y:110,w:190,h:100,label:"pick a new ancestor",sub:"the reference gets a different past"},
+    {id:"blocked",x:910,y:110,w:180,h:100,label:"needs a density",sub:"Gillespie can sample this and cannot evaluate it"}
+  ],
+  arrows:[
+    {id:"c1",from:"cand",to:"score"},{id:"c2",from:"refp",to:"score"},
+    {id:"c3",from:"score",to:"pick"},{id:"c4",from:"pick",to:"blocked",dash:true}
+  ],
+  steps:[
+    {boxes:["cand","refp"],arrows:[],text:"At each day the reference path has a state, and the filter has a cloud of candidates for the day before."},
+    {boxes:["score"],arrows:["c1","c2"],text:"Score each candidate by its weight times the probability of jumping from it to the reference state over one day."},
+    {boxes:["pick"],arrows:["c3"],text:"Draw one, and graft the reference onto it. The reference keeps its future and gets a new past, which is what breaks the collapse."},
+    {boxes:["blocked"],arrows:["c4"],text:"That probability is a one-day transition density. The Gillespie simulator draws from it but cannot evaluate it, so this step is the obstacle for this model rather than the algorithm."}
+  ]
+});
+
+/* ---------- SMC² ---------- */
+player("d4",{
+  boxes:[
+    {id:"cloud",x:40,y:110,w:200,h:90,label:"a cloud of θ values",sub:"each one a particle in parameter space"},
+    {id:"filts",x:300,y:40,w:230,h:100,label:"one filter per θ",sub:"independent, and this is where the cores go"},
+    {id:"day",x:300,y:190,w:230,h:80,label:"the next day of data",sub:"one more count"},
+    {id:"rw",x:600,y:110,w:210,h:100,label:"reweight the θ cloud",sub:"by each filter's contribution for that day"},
+    {id:"move",x:870,y:110,w:210,h:100,label:"resample and move",sub:"a PMMH kernel when the θ weights degenerate"}
+  ],
+  arrows:[
+    {id:"e1",from:"cloud",to:"filts"},{id:"e2",from:"day",to:"rw"},
+    {id:"e3",from:"filts",to:"rw"},{id:"e4",from:"rw",to:"move"},
+    {id:"e5",from:"move",to:"cloud",back:true,label:"and on to the next day"}
+  ],
+  steps:[
+    {boxes:["cloud"],arrows:[],text:"Instead of one parameter set moving through the space, carry many at once, drawn from the prior."},
+    {boxes:["filts"],arrows:["e1"],text:"Each parameter particle runs its own filter. Nothing couples them, so this is the step that fills a many-core machine or a cluster."},
+    {boxes:["day","rw"],arrows:["e2","e3"],text:"Add one day of data. Each parameter particle is reweighted by what its filter says about that day, which also accumulates the marginal likelihood."},
+    {boxes:["move"],arrows:["e4","e5"],text:"When the parameter weights concentrate, resample them and move them with a PMMH kernel, then carry on to the next day."}
+  ]
+});
+
+/* ---------- filter-level proposals ---------- */
+player("d5",{
+  boxes:[
+    {id:"boot",x:60,y:40,w:250,h:90,label:"bootstrap",sub:"simulate from the model, then weight by the count"},
+    {id:"guid",x:60,y:160,w:250,h:90,label:"guided",sub:"look at the count first, propose towards it, correct by the proposal density"},
+    {id:"aux",x:380,y:100,w:250,h:90,label:"auxiliary",sub:"resample on a lookahead weight before propagating"},
+    {id:"cost",x:700,y:40,w:180,h:90,label:"fewer particles",sub:"for the same variance"},
+    {id:"need",x:700,y:160,w:180,h:90,label:"more to write",sub:"a proposal and a density SEIT4L does not come with"},
+    {id:"same",x:930,y:100,w:150,h:90,label:"same target",sub:"neither is a source of bias"}
+  ],
+  arrows:[
+    {id:"f1",from:"boot",to:"aux"},{id:"f2",from:"guid",to:"aux"},
+    {id:"f3",from:"aux",to:"cost"},{id:"f4",from:"aux",to:"need"},
+    {id:"f5",from:"cost",to:"same"}
+  ],
+  steps:[
+    {boxes:["boot"],arrows:[],text:"The bootstrap filter proposes from the model and only then looks at the day's count. It is the simplest thing that works and needs nothing from you."},
+    {boxes:["guid"],arrows:[],text:"A guided proposal uses the count before proposing, so the particles land where the data are, and divides by its own density to stay honest."},
+    {boxes:["aux"],arrows:["f1","f2"],text:"The auxiliary filter resamples first on a lookahead weight, so effort goes to particles that were going to matter."},
+    {boxes:["cost","need"],arrows:["f3","f4"],text:"Both buy the same thing: fewer particles for the same noise. Both need something SEIT4L does not come with, built from a deterministic one-day prediction."},
+    {boxes:["same"],arrows:["f5"],text:"Neither changes what the sampler targets. This choice is about cost, not correctness."}
+  ]
+});
+</script>
+<script>
+/* embed mode: ?embed=sectionId[,id2,...] strips the page chrome AND the
+   explanatory prose/maths from the kept sections, leaving only the interactive
+   figures, for inlining in an <iframe> in the course site. Reports height so the
+   host page can auto-size the iframe. */
+(function(){
+  var q=new URLSearchParams(location.search), e=q.get('embed');
+  var KEEP={fig:1,controls:1,readout:1,legend:1,presets:1,figcap:1};
+  if(e){
+    var keep=e.split(',').map(function(s){return s.trim();}).filter(Boolean);
+    ['header.hero','nav.toc','footer'].forEach(function(sel){
+      Array.prototype.forEach.call(document.querySelectorAll(sel),function(n){n.style.display='none';});
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('body > div'),function(d){
+      if(!d.classList.contains('wrap')) d.style.display='none';
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('section'),function(sec){
+      if(keep.indexOf(sec.id)===-1){ sec.style.display='none'; return; }
+      sec.style.margin='0'; sec.style.border='none'; sec.style.boxShadow='none'; sec.style.padding='2px 2px 8px';
+      Array.prototype.forEach.call(sec.children,function(c){
+        var k=false, cl=c.classList; if(cl){ for(var key in KEEP){ if(cl.contains(key)){k=true;break;} } }
+        if(!k) c.style.display='none';
+      });
+    });
+    var wrap=document.querySelector('.wrap'); if(wrap) wrap.style.padding='0 8px 10px';
+    document.body.style.background='#fff'; document.documentElement.style.background='#fff';
+  }
+  function postH(){ try{ parent.postMessage({nfiddEmbedHeight: Math.ceil(document.body.getBoundingClientRect().height)}, '*'); }catch(_){} }
+  window.addEventListener('load', postH);
+  window.addEventListener('resize', postH);
+  document.addEventListener('input', function(){ setTimeout(postH,60); });
+  document.addEventListener('click', function(){ setTimeout(postH,120); });
+  setTimeout(postH,250); setTimeout(postH,1000);
+})();
+</script>
+</body>
+</html>

@@ -273,7 +273,14 @@
       <div class="fig">
         <svg id="p3" viewBox="0 0 470 240" role="img" aria-label="The particle filter run that scored the current proposal: particle predictions for each day against the observed counts."></svg>
       </div>
-      <p class="figcap">The filter run behind the number in the ledger. Amber is one particle's prediction for a day, red is the count it was weighted against.</p>
+      <div class="controls" style="margin-top:6px">
+        <label><span class="vlabel">Filter day: <span id="pfdval">all</span></span>
+          <input id="pfd" type="range" min="1" max="59" step="1" value="59" /></label>
+        <button id="pfplay" style="font:600 13px inherit; border:1px solid #c7d2fe; background:#fff; color:var(--fc); padding:6px 13px; border-radius:8px; cursor:pointer">Play the filter</button>
+        <span class="plabel" id="pfll" style="font-size:13.5px; color:var(--muted)"></span>
+      </div>
+      <p class="figcap">The filter run behind the number in the ledger, and you can walk it a day at a time.
+      Amber is one particle's prediction for a day, red is the count it was weighted against.</p>
       <div class="fig">
         <svg id="p5" viewBox="0 0 470 240" role="img" aria-label="Acceptance rate so far and movement per iteration so far, both against iteration."></svg>
       </div>
@@ -342,11 +349,13 @@
     </div>
     <div class="fig">
       <svg id="k3" viewBox="0 0 560 260" role="img" aria-label="How long the plateaus are at each particle count, as a share of the accepted states falling in each length band."></svg>
+      <p class="figcap">The same thing counted up. Bars to the left are states the chain left quickly, bars to the right are states it sat on.</p>
     </div>
   </div>
-  <p class="figcap">Each point is one state the noisier chain accepted.
-  Its position left to right is how much the stored value flattered that state, and its height is how many iterations the chain then sat still.
-  Points to the right of the dashed line are lucky readings, and the higher they sit, the longer the chain paid for them.</p>
+  <p class="figcap">Each point is one parameter set the noisier chain accepted.
+  Its height is how many proposals the chain then turned down before it moved again, so a point at 40 means it accepted that parameter set and rejected the next 40 proposals.
+  Its position left to right is how much the reading it stored flattered that parameter set: to the right of the dashed line the chain recorded a likelihood better than the parameters deserve.
+  The pattern to look for is points drifting up as they go right, which is a lucky reading being paid for in iterations.</p>
 
   <div class="readout">
     <span class="chip">acceptance, few particles<b id="kacc1">&ndash;</b></span>
@@ -557,7 +566,7 @@ function newRun(th,J,seed,policy,thresh){
           policy:policy, thresh:(thresh===undefined?1:thresh),
           day:0, stage:0, logL:0, dead:false, cloud:[],
           inc:null, mu:null, W:null, ess:null, llInc:null, counts:null,
-          order:null, idx:null, essTrace:[]};
+          order:null, idx:null, essTrace:[], incs:[]};
 }
 function doPropagate(r){
   var i,J=r.J,inc=new Float64Array(J),mu=new Float64Array(J);
@@ -580,6 +589,7 @@ function doWeight(r){
   r.llInc=Math.log(s)+mx;              /* Wprev sums to one, so no 1/J here */
   for(i=0;i<J;i++) W[i]/=s;
   r.W=W; r.ess=essOf(W); r.logL+=r.llInc; r.essTrace.push(r.ess);
+  r.incs.push(r.llInc);
   r.cloud[r.day]={mu:Array.prototype.slice.call(r.mu),
                   W:Array.prototype.slice.call(W)};
   r.stage=2;
@@ -960,8 +970,28 @@ function poolLabel(){
       bReset=document.getElementById("preset"), note=document.getElementById("pnote");
   var c=null, timer=null, seed=71;
 
-  var s3=document.getElementById("p3");
+  var s3=document.getElementById("p3"), dayI=document.getElementById("pfd"),
+      fplay=document.getElementById("pfplay"), ftimer=null;
   function build(){ c=newChain(BAR.J,BAR.scale,BAR.which,seed,START); c.keep=true; }
+  function stopFilterPlay(){ if(ftimer){ clearInterval(ftimer); ftimer=null;
+    fplay.textContent="Play the filter"; } }
+  dayI.addEventListener("input",function(){
+    document.getElementById("pfdval").textContent=
+      (+dayI.value>=NDAYS)?"all":dayI.value;
+    stopFilterPlay(); drawFilter();
+  });
+  fplay.addEventListener("click",function(){
+    if(ftimer){ stopFilterPlay(); return; }
+    if(!(c.stage>=2&&c.propRun)) return;
+    dayI.value=1; fplay.textContent="Pause";
+    ftimer=setInterval(function(){
+      var v=+dayI.value+1;
+      dayI.value=v;
+      document.getElementById("pfdval").textContent=(v>=NDAYS)?"all":String(v);
+      drawFilter();
+      if(v>=NDAYS) stopFilterPlay();
+    },70);
+  });
 
   /* what the filter did for the proposal being judged */
   function drawFilter(){
@@ -970,27 +1000,41 @@ function poolLabel(){
     var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(0,YMAX,L.y1,L.y0);
     frame(s3,L,xs,ys,[0,20,40,59],[0,20,40,60],"day","reported cases");
     var run=(c.stage>=2&&c.propRun)?c.propRun:null;
+    var upto=+dayI.value, running=0;
     if(!run){
       tx(s3,{x:(L.x0+L.x1)/2,y:(L.y0+L.y1)/2,"font-size":12.5,fill:"#9ca3af","text-anchor":"middle"},
          c.stage===1?"run the filter to score this proposal":"propose a parameter set first");
+      document.getElementById("pfll").textContent="";
     } else {
       var stride=Math.max(1,Math.ceil(c.J/24));
-      for(d=0;d<run.cloud.length;d++){
+      for(d=0;d<run.cloud.length && d<upto;d++){
         var cl=run.cloud[d]; if(!cl) continue;
+        running+=run.incs[d];
         for(i=0;i<cl.mu.length;i+=stride)
           add(s3,"circle",{cx:xs(d+1),cy:ys(Math.min(YMAX,cl.mu[i])),r:1.7,
-                           fill:C.part,"fill-opacity":0.3});
+                           fill:C.part,"fill-opacity":(d===upto-1?0.85:0.3)});
+      }
+      if(upto<NDAYS){
+        add(s3,"line",{x1:xs(upto),y1:L.y0,x2:xs(upto),y2:L.y1,stroke:C.fc,
+                       "stroke-width":1.4,"stroke-opacity":0.5});
       }
     }
-    for(d=0;d<NDAYS;d++) diamond(s3,xs(d+1),ys(Math.min(YMAX,OBS[d])),2.6,C.data);
-    if(run)
+    for(d=0;d<NDAYS;d++)
+      diamond(s3,xs(d+1),ys(Math.min(YMAX,OBS[d])),2.6,
+              (run&&d<upto)?C.data:"#f3b4b4");
+    if(run){
       tx(s3,{x:L.x1,y:L.y0+12,"font-size":11.5,fill:"#6b7280","text-anchor":"end"},
          c.J+" particles, log L̂ = "+run.logL.toFixed(1));
+      document.getElementById("pfll").textContent=
+        upto>=NDAYS ? "the whole run, log L̂ = "+run.logL.toFixed(1)
+                    : ("to day "+upto+": "+running.toFixed(1)+" of "+run.logL.toFixed(1));
+    }
   }
   function stopPlay(){ if(timer){ clearInterval(timer); timer=null; bPlay.textContent="Play"; } }
   function step(){
     if(c.stage===0||c.stage===3) propose(c);
-    else if(c.stage===1) evaluate(c);
+    else if(c.stage===1){ evaluate(c); stopFilterPlay();
+      dayI.value=NDAYS; document.getElementById("pfdval").textContent="all"; }
     else decide(c);
   }
   var running=false;
@@ -1272,7 +1316,7 @@ function poolLabel(){
     var xt=[Math.round(mne-1),0,Math.round(mxe+1)];
     frame(s2,L2,xs2,ys2,xt,[0,Math.round(mxp/2),mxp],
           "how much the stored value flattered the state, in log-likelihood",
-          "iterations stuck after it");
+          "iterations before the chain moved again");
     add(s2,"line",{x1:xs2(0),y1:L2.y0,x2:xs2(0),y2:L2.y1,stroke:C.grey,
                    "stroke-width":1.4,"stroke-dasharray":"4 3"});
     for(i=0;i<pts.length;i++)
@@ -1304,7 +1348,7 @@ function poolLabel(){
     var hL=bandCounts(low), hH=bandCounts(high), mxb=0.05;
     for(i=0;i<hL.length;i++){ if(hL[i]>mxb) mxb=hL[i]; if(hH[i]>mxb) mxb=hH[i]; }
     var xs3=lin(0,lab.length,L3.x0,L3.x1), ys3=lin(0,mxb*1.12,L3.y1,L3.y0);
-    frame(s3,L3,xs3,ys3,[],[0,mxb/2,mxb],"iterations stuck after an accepted state",
+    frame(s3,L3,xs3,ys3,[],[0,mxb/2,mxb],"iterations before the chain moved again",
           "share of accepted states", function(v){ return (100*v).toFixed(0)+"%"; });
     var bw3=(L3.x1-L3.x0)/lab.length;
     for(i=0;i<lab.length;i++){
