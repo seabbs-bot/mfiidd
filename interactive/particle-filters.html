@@ -23,7 +23,8 @@
     margin:0; background:var(--bg); color:var(--ink);
     font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   }
-  .wrap{max-width:920px; margin:0 auto; padding:0 22px 120px}
+  .wrap{max-width:1340px; margin:0 auto; padding:0 22px 120px}
+  .prose{max-width:78ch}
   header.hero{
     padding:54px 22px 30px; text-align:center;
     background:linear-gradient(180deg,#eef2ff 0%, var(--bg) 100%);
@@ -57,6 +58,12 @@
   .figcap{font-size:13.5px; color:var(--muted); margin:8px 4px 2px}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px}
   @media (max-width:760px){ .grid2{grid-template-columns:1fr} }
+  /* the day axis on the left, the day being filtered on the right */
+  .cols{display:grid; grid-template-columns:1.32fr 1fr; gap:18px; align-items:start}
+  .cols > div > .fig:first-child{margin-top:0}
+  @media (max-width:1040px){ .cols{grid-template-columns:1fr} }
+  .colhead{font-size:13px; font-weight:700; color:var(--muted); margin:2px 4px -6px;
+           text-transform:uppercase; letter-spacing:.04em}
   .controls{
     display:flex; flex-wrap:wrap; gap:16px 26px; align-items:center;
     margin:8px 4px 2px; padding:12px 14px; background:#f8fafc;
@@ -172,7 +179,7 @@
   That estimator is run in full below, and it fails.</p>
 
   <div class="fig">
-    <svg id="s1svg" viewBox="0 0 720 320" role="img" aria-label="Simulated daily reported cases from the SEIT4L model plotted against the Tristan da Cunha data. Most paths are grey, and the few paths holding the weight are drawn in colour on top."></svg>
+    <svg id="s1svg" viewBox="0 0 1120 290" role="img" aria-label="Simulated daily reported cases from the SEIT4L model plotted against the Tristan da Cunha data. Most paths are grey, and the few paths holding the weight are drawn in colour on top."></svg>
   </div>
   <div class="legend">
     <span><i class="swatch" style="border-color:#cbd5e1"></i> a path with no weight</span>
@@ -183,11 +190,11 @@
 
   <div class="grid2">
     <div class="fig">
-      <svg id="s1w" viewBox="0 0 360 280" role="img" aria-label="Each path's share of the weight using the data up to each day, on a logarithmic scale, with most paths falling away and the few heaviest ones, drawn in the colours used above, climbing towards one."></svg>
+      <svg id="s1w" viewBox="0 0 500 290" role="img" aria-label="Each path's share of the weight using the data up to each day, on a logarithmic scale, with most paths falling away and the few heaviest ones, drawn in the colours used above, climbing towards one."></svg>
       <p class="figcap">Each path's share of the weight, day by day. The colours are the same five paths.</p>
     </div>
     <div class="fig">
-      <svg id="s1e" viewBox="0 0 360 280" role="img" aria-label="Effective sample size of the path weights using the data up to each day, falling day by day, drawn over pale bars showing the observed count on each day."></svg>
+      <svg id="s1e" viewBox="0 0 500 290" role="img" aria-label="Effective sample size of the path weights using the data up to each day, falling day by day, drawn over pale bars showing the observed count on each day."></svg>
       <p class="figcap">How many paths still count, day by day, over the counts that did it.</p>
     </div>
   </div>
@@ -209,7 +216,7 @@
     <button id="s1reroll" style="font:600 13px inherit; border:1px solid #c7d2fe; background:#fff; color:var(--fc); padding:6px 13px; border-radius:8px; cursor:pointer">New random paths</button>
   </div>
 
-  <div class="key amber">The weight of a whole path is a product of 59 daily factors, one for each count.
+  <div class="prose key amber">The weight of a whole path is a product of 59 daily factors, one for each count.
   A path pays for every day it is wrong, and it pays most on the days with the most cases, because the Poisson density falls away fastest there.
   The first three days cost almost nothing, since 0, 1 and 0 cases are easy to match.
   The fall starts as the epidemic takes off, and by the end of the first wave the average is carried by a handful of paths out of hundreds.
@@ -253,8 +260,11 @@
     <button data-day="59">the end</button>
   </div>
 
+  <div class="cols">
+  <div>
+  <p class="colhead">the whole outbreak</p>
   <div class="fig">
-    <svg id="f2svg" viewBox="0 0 720 330" role="img" aria-label="Daily reported cases against day. Amber dots are the particle predictions for each day, sized by weight on the current day, and red diamonds are the observed counts."></svg>
+    <svg id="f2svg" viewBox="0 0 700 300" role="img" aria-label="Daily reported cases against day. Amber dots are the particle predictions for each day, sized by weight on the current day, and red diamonds are the observed counts."></svg>
   </div>
   <div class="legend">
     <span><i class="swbox" style="background:var(--miss)"></i> particle prediction</span>
@@ -263,27 +273,30 @@
   </div>
 
   <div class="fig">
-    <svg id="f2g" viewBox="0 0 720 200" role="img" aria-label="Particle ancestry on the same day axis: grey lines are every particle the filter has held, coloured lines are the ancestry the particles alive today came down through the copies they were made from."></svg>
+    <svg id="f2g" viewBox="0 0 700 175" role="img" aria-label="Particle ancestry on the same day axis: grey lines are every particle the filter has held, coloured lines are the ancestry the particles alive today came down through the copies they were made from."></svg>
   </div>
   <p class="figcap">The same days, underneath. Grey is every particle the filter has held, colour is the ancestry today's particles came down.
   Resampling keeps the present healthy by spending the past, so the lines merge behind you as you step.</p>
 
-  <div class="grid2">
-    <div class="fig">
-      <svg id="f2w" viewBox="0 0 360 280" role="img" aria-label="The Poisson observation density read as a function of the particle prediction, with each particle drawn as a stem at its own prediction."></svg>
-      <p class="figcap">The weight function. A particle is worth what it makes today's count.</p>
-    </div>
-    <div class="fig">
-      <svg id="f2b" viewBox="0 0 360 280" role="img" aria-label="Top: normalised weight of every particle, ordered by prediction. Bottom: the number of copies each particle received when resampled."></svg>
-      <p class="figcap">The reweighting histogram, and what resampling does with it.</p>
-    </div>
-  </div>
-
   <div class="fig">
-    <svg id="f2e" viewBox="0 0 720 260" role="img" aria-label="Effective sample size against day. The solid line is the run being stepped, up to today. The faint line is the same run with the other resampling policy, over all 59 days."></svg>
+    <svg id="f2e" viewBox="0 0 700 235" role="img" aria-label="Effective sample size against day. The solid line is the run being stepped, up to today. The faint lines are the same run under the other two resampling policies, over all 59 days."></svg>
   </div>
   <p class="figcap">The vertical scale is logarithmic and one effective particle is the floor.
   The run you are stepping is the solid line. The other two policies are run to the end on the same seed and drawn faint, so the three can be read against each other.</p>
+  </div>
+
+  <div>
+  <p class="colhead">the day being filtered</p>
+    <div class="fig">
+      <svg id="f2w" viewBox="0 0 470 300" role="img" aria-label="The Poisson observation density read as a function of the particle prediction, with each particle drawn as a stem at its own prediction."></svg>
+      <p class="figcap">The weight function. A particle is worth what it makes today's count.</p>
+    </div>
+    <div class="fig">
+      <svg id="f2b" viewBox="0 0 470 330" role="img" aria-label="Top: normalised weight of every particle, ordered by prediction. Bottom: the number of copies each particle received when resampled."></svg>
+      <p class="figcap">The reweighting histogram, and what resampling does with it.</p>
+    </div>
+  </div>
+  </div>
 
   <div class="readout">
     <span class="chip">day<b id="f2day">&ndash;</b></span>
@@ -311,10 +324,10 @@
   </div>
   <p class="figcap">Changing a control restarts the run. The other parameters are the ones the practical calibrates at: D<sub>lat</sub> = 1.3, D<sub>inf</sub> = 2.0, &alpha; = 0.5, D<sub>imm</sub> = 10.5, &rho; = 0.7.</p>
 
-  <div class="key">The filter is estimating the likelihood, and for that it only needs today's particles to be right.
+  <div class="prose key">The filter is estimating the likelihood, and for that it only needs today's particles to be right.
   The collapsed ancestry is why the same output should not be read as a reconstruction of the whole epidemic.</div>
 
-  <div class="turn">
+  <div class="prose turn">
     <h4>Your turn</h4>
     <ol>
       <li>Step through day 6, where 32 cases were reported. Watch which particles keep a weight, how many distinct particles survive the resampling, and what that does to the ancestry below.</li>
@@ -351,7 +364,7 @@
   </div>
   <div class="prog"><i id="f5bar"></i></div>
   <div class="fig">
-    <svg id="f5svg" viewBox="0 0 720 300" role="img" aria-label="Left: standard deviation of the log-likelihood estimate against the number of particles, with the target band from one to three shaded. Right: mean log-likelihood estimate against the number of particles."></svg>
+    <svg id="f5svg" viewBox="0 0 1120 290" role="img" aria-label="Left: standard deviation of the log-likelihood estimate against the number of particles, with the target band from one to three shaded. Right: mean log-likelihood estimate against the number of particles."></svg>
   </div>
   <div class="controls">
     <label><span class="vlabel">Repeats per count: <span id="f5rval">20</span></span>
@@ -366,7 +379,7 @@
     <span class="chip">its cost per run<b id="f5cost">&ndash;</b></span>
   </div>
 
-  <div class="turn">
+  <div class="prose turn">
     <h4>Your turn</h4>
     <ol>
       <li>Which count is the first to land inside the target band of one to three?</li>
@@ -394,7 +407,7 @@
   Press the button again to draw another sweep over the first.</p>
 
   <div class="fig">
-    <svg id="f6svg" viewBox="0 0 720 300" role="img" aria-label="Estimated log-likelihood against R nought, with several repeated sweeps overlaid to show how much the curve moves between runs."></svg>
+    <svg id="f6svg" viewBox="0 0 1120 270" role="img" aria-label="Estimated log-likelihood against R nought, with several repeated sweeps overlaid to show how much the curve moves between runs."></svg>
   </div>
   <div class="stage">
     <button id="f6run">Sweep again</button>
@@ -410,7 +423,7 @@
   </div>
   <p class="figcap">Spread at the peak is the range of estimates at the best R<sub>0</sub> across the sweeps drawn.</p>
 
-  <div class="key red">Near the top the curve is flat, and the noise is comparable to the difference between neighbouring parameter values.
+  <div class="prose key red">Near the top the curve is flat, and the noise is comparable to the difference between neighbouring parameter values.
   That is the difficulty of particle MCMC in one figure.</div>
 </section>
 
@@ -610,6 +623,12 @@ function el(tag,attrs){ var e=document.createElementNS(SVGNS,tag);
 function add(svg,tag,attrs){ var e=el(tag,attrs); svg.appendChild(e); return e; }
 function clear(svg){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
 function tx(svg,attrs,s){ var e=el("text",attrs); e.textContent=s; svg.appendChild(e); return e; }
+/* Panel geometry read from the element's own viewBox, so the page can be
+   reshaped in the markup without touching any of the drawing code. */
+function pane(svg,l,t,r,b){
+  var v=svg.getAttribute("viewBox").split(/[\s,]+/);
+  return {x0:l, x1:(+v[2])-r, y0:t, y1:(+v[3])-b, w:+v[2], h:+v[3]};
+}
 function lin(d0,d1,r0,r1){ var m=(r1-r0)/(d1-d0); return function(v){ return r0+(v-d0)*m; }; }
 function frame(svg,L,xs,ys,xt,yt,xlab,ylab,fy){
   var i;
@@ -709,7 +728,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
 
   function drawPaths(r){
     clear(svgP);
-    var L={x0:52,x1:706,y0:14,y1:258}, YMAX=60, d, k;
+    var L=pane(svgP,52,14,14,62), YMAX=60, d, k;
     var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(0,YMAX,L.y1,L.y0);
     frame(svgP,L,xs,ys,[0,10,20,30,40,50,59],[0,20,40,60],
           "day of the outbreak","reported cases");
@@ -729,7 +748,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
 
   function drawWeights(r){
     clear(svgW);
-    var L={x0:52,x1:346,y0:20,y1:206}, i, d;
+    var L=pane(svgW,52,20,14,74), i, d;
     var lg=Math.log(10), floor=-6;
     var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(floor,0,L.y1,L.y0);
     var yt=[0,-2,-4,-6];
@@ -759,7 +778,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
 
   function drawEss(r){
     clear(svgE);
-    var L={x0:52,x1:346,y0:20,y1:206}, d;
+    var L=pane(svgE,52,20,14,74), d;
     var lg2=Math.log(2), top=Math.log(r.J)/lg2;
     var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(0,top,L.y1,L.y0);
     var yt=[], v;
@@ -787,7 +806,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
       tx(svgE,{x:xs(hit+1)+5,y:L.y0+13,"font-size":11.5,fill:C.data},
          "day "+(hit+1)+", y = "+OBS[hit]);
     }
-    tx(svgE,{x:L.x0+4,y:L.y0+13,"font-size":11,fill:"#9ca3af"},"pale bars are the counts");
+    tx(svgE,{x:L.x0+4,y:L.y1-7,"font-size":11,fill:"#9ca3af"},"pale bars are the counts");
     return hit;
   }
 
@@ -886,7 +905,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   /* ---- the filtering plot ---- */
   function drawA(){
     clear(svgA);
-    var L={x0:52,x1:706,y0:14,y1:262}, YMAX=60, d, i;
+    var L=pane(svgA,52,14,14,68), YMAX=60, d, i;
     var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(0,YMAX,L.y1,L.y0);
     var bw=(L.x1-L.x0)/NDAYS;
     if(run.day<NDAYS)
@@ -925,7 +944,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   /* ---- the ancestry of the particles alive today ---- */
   function drawG(){
     clear(svgG);
-    var L={x0:52,x1:706,y0:16,y1:150}, J=run.J, T=run.anc.length, i, t;
+    var L=pane(svgG,52,16,14,50), J=run.J, T=run.anc.length, i, t;
     var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(0,Math.max(1,J-1),L.y1,L.y0);
     frame(svgG,L,xs,ys,[0,10,20,30,40,50,59],[],"day of the outbreak","particle");
     var stride=Math.max(1,Math.ceil(J/64));
@@ -967,7 +986,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   /* ---- the effective sample size, against the other policy ---- */
   function drawE(){
     clear(svgE);
-    var L={x0:56,x1:706,y0:16,y1:198}, J=run.J, i;
+    var L=pane(svgE,56,38,14,62), J=run.J, i;
     var lg2=Math.log(2), top=Math.log(J)/lg2;
     var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(0,top,L.y1,L.y0);
     var yt=[]; for(i=0;i<=top+0.001;i++) yt.push(i);
@@ -982,14 +1001,13 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
       if(e&&dash) e.setAttribute("stroke-dasharray","5 4");
     }
     var COL={always:C.fc, ess:C.w, never:C.data},
-        NAME={always:"resampling every day", ess:"resampling below the threshold",
-              never:"never resampling"};
+        SHORT={always:"every day", ess:"below the threshold", never:"never"};
     if(run.policy==="ess" || pE.checked){
       var ty=ys(Math.log(Math.max(1,run.thresh*J))/lg2);
       add(svgE,"line",{x1:L.x0,y1:ty,x2:L.x1,y2:ty,stroke:C.w,
         "stroke-width":1.2,"stroke-dasharray":"2 4","stroke-opacity":0.8});
     }
-    var order=["always","ess","never"], y0=L.y0+15;
+    var order=["always","ess","never"], lx=L.x0;
     order.forEach(function(q){
       if(ref[q]) trace(ref[q].essTrace,COL[q],1.5,0.4,true);
     });
@@ -997,12 +1015,15 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
     if(run.day<NDAYS)
       add(svgE,"line",{x1:xs(run.day+1),y1:L.y0,x2:xs(run.day+1),y2:L.y1,
         stroke:"#c7d2fe","stroke-width":1.6});
+    /* the legend sits above the axes, where it cannot cover a trace */
     order.forEach(function(q){
-      var live=(q===run.policy);
-      tx(svgE,{x:L.x1-6,y:y0,"font-size":live?12.5:12,"font-weight":live?700:400,
-               fill:COL[q],"text-anchor":"end"},
-         (live?"this run, ":"the same seed, ")+NAME[q]);
-      y0+=17;
+      var live=(q===run.policy), lab=(live?"this run, ":"same seed, ")+SHORT[q];
+      var e=add(svgE,"line",{x1:lx,y1:L.y0-22,x2:lx+18,y2:L.y0-22,stroke:COL[q],
+        "stroke-width":live?2.6:1.6,"stroke-opacity":live?1:0.5});
+      if(!live) e.setAttribute("stroke-dasharray","5 4");
+      tx(svgE,{x:lx+24,y:L.y0-18,"font-size":live?12.5:12,
+               "font-weight":live?700:400,fill:COL[q]},lab);
+      lx+=34+lab.length*(live?6.9:6.6);
     });
     var fmt=function(v){ return isFinite(v)?v.toFixed(1):"−∞"; };
     var mineLL=run.essTrace.length?fmt(run.logL)+(run.day<NDAYS-1?" so far":""):"–";
@@ -1016,9 +1037,10 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   /* ---- the weight function ---- */
   function drawW(){
     clear(svgW);
-    var L={x0:46,x1:348,y0:18,y1:208}, i;
+    var L=pane(svgW,46,18,12,72), i;
     if(!run.mu || run.day>=NDAYS){
-      tx(svgW,{x:190,y:110,"font-size":13,fill:"#9ca3af","text-anchor":"middle"},
+      tx(svgW,{x:pane(svgW,0,0,0,0).w/2,y:pane(svgW,0,0,0,0).h/2,"font-size":13,
+               fill:"#9ca3af","text-anchor":"middle"},
          run.day>=NDAYS?"the data are exhausted":"propagate first");
       return;
     }
@@ -1055,15 +1077,18 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   /* ---- the reweighting histogram, and the copies ---- */
   function drawB(){
     clear(svgB);
-    var LT={x0:46,x1:348,y0:26,y1:120}, LB={x0:46,x1:348,y0:172,y1:250}, k,i;
-    tx(svgB,{x:LT.x0,y:16,"font-size":12,"font-weight":700,fill:"#334155"},"normalised weight");
-    tx(svgB,{x:LB.x0,y:162,"font-size":12,"font-weight":700,fill:"#334155"},"copies after resampling");
+    var g=pane(svgB,46,26,12,30), avail=(g.y1-g.y0)-52;
+    var LT={x0:g.x0,x1:g.x1,y0:g.y0,y1:g.y0+avail*0.55},
+        LB={x0:g.x0,x1:g.x1,y0:g.y0+avail*0.55+52,y1:g.y1}, k,i;
+    tx(svgB,{x:LT.x0,y:LT.y0-10,"font-size":12,"font-weight":700,fill:"#334155"},"normalised weight");
+    tx(svgB,{x:LB.x0,y:LB.y0-10,"font-size":12,"font-weight":700,fill:"#334155"},"copies after resampling");
     add(svgB,"line",{x1:LT.x0,y1:LT.y1,x2:LT.x1,y2:LT.y1,stroke:"#94a3b8"});
     add(svgB,"line",{x1:LB.x0,y1:LB.y1,x2:LB.x1,y2:LB.y1,stroke:"#94a3b8"});
     tx(svgB,{x:(LB.x0+LB.x1)/2,y:LB.y1+22,"font-size":12,fill:"#475569","text-anchor":"middle"},
        "particles, ordered by prediction");
     if(!run.W){
-      tx(svgB,{x:197,y:76,"font-size":13,fill:"#9ca3af","text-anchor":"middle"},"weight the particles first");
+      tx(svgB,{x:(LT.x0+LT.x1)/2,y:(LT.y0+LT.y1)/2,"font-size":13,fill:"#9ca3af",
+               "text-anchor":"middle"},"weight the particles first");
       return;
     }
     var J=run.J, ord=run.order, bw=(LT.x1-LT.x0)/J, maxW=0;
@@ -1088,7 +1113,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
       tx(svgB,{x:LB.x1,y:LB.y0+2,"font-size":11,fill:"#6b7280","text-anchor":"end"},
          "most copied "+maxC+" times");
     } else {
-      tx(svgB,{x:197,y:216,"font-size":12.5,fill:"#9ca3af","text-anchor":"middle"},
+      tx(svgB,{x:(LB.x0+LB.x1)/2,y:(LB.y0+LB.y1)/2,"font-size":12.5,fill:"#9ca3af","text-anchor":"middle"},
          run.policy==="never"?"resampling is off, weights carry forward":
            (run.stage>=3?"no resampling today, the weights carry forward":"resample to fill this"));
     }
@@ -1197,7 +1222,9 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   }
   function draw(){
     clear(svg);
-    var LA={x0:56,x1:346,y0:20,y1:236}, LB={x0:412,x1:702,y0:20,y1:236}, i;
+    var g=pane(svg,56,20,18,64), each=((g.x1-g.x0)-66)/2;
+    var LA={x0:g.x0,x1:g.x0+each,y0:g.y0,y1:g.y1},
+        LB={x0:g.x0+each+66,x1:g.x1,y0:g.y0,y1:g.y1}, i;
     var lg2=Math.log(2);
     var xs=lin(Math.log(4)/lg2,Math.log(256)/lg2,LA.x0,LA.x1);
     var xsb=lin(Math.log(4)/lg2,Math.log(256)/lg2,LB.x0,LB.x1);
@@ -1264,7 +1291,7 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
          "grey: "+prev.label);
     }
     if(!out.length){
-      tx(svg,{x:(LA.x0+LB.x1)/2,y:LA.y1/2,"font-size":13,fill:"#9ca3af","text-anchor":"middle"},
+      tx(svg,{x:(LA.x0+LB.x1)/2,y:(LA.y0+LA.y1)/2,"font-size":13,fill:"#9ca3af","text-anchor":"middle"},
          "press the button to run the calibration");
       document.getElementById("f5pick").textContent="–";
       document.getElementById("f5cost").textContent="–";
@@ -1305,12 +1332,17 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
     var i,k;
     document.getElementById("f6jval").textContent=1<<(+jI.value);
     clear(svg);
-    var L={x0:60,x1:706,y0:18,y1:238};
-    var mx=-Infinity;
-    for(k=0;k<sweeps.length;k++) for(i=0;i<GRID.length;i++)
-      if(isFinite(sweeps[k][i]) && sweeps[k][i]>mx) mx=sweeps[k][i];
-    if(!isFinite(mx)) mx=-110;
-    var lo=mx-70, hi=mx+6;
+    var L=pane(svg,60,18,14,62);
+    var mx=-Infinity, mn=Infinity;
+    for(k=0;k<sweeps.length;k++) for(i=0;i<GRID.length;i++){
+      var v2=sweeps[k][i];
+      if(!isFinite(v2)) continue;
+      if(v2>mx) mx=v2;
+      if(v2<mn) mn=v2;
+    }
+    if(!isFinite(mx)) { mx=-110; mn=-160; }
+    /* fill the panel with the curve rather than with empty space below it */
+    var lo=Math.max(mn-3,mx-90), hi=mx+3;
     var xs=lin(3,12,L.x0,L.x1), ys=lin(lo,hi,L.y1,L.y0);
     var yt=[]; for(i=0;i<=4;i++) yt.push(Math.round(lo+(hi-lo)*i/4));
     frame(svg,L,xs,ys,[3,4,5,6,7,8,9,10,11,12],yt,"R₀","estimated log-likelihood");
