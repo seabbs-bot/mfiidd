@@ -212,6 +212,7 @@
     <span class="chip">the proposal, judged exactly<b id="n2exact">&ndash;</b></span>
     <span class="chip">its acceptance probability, 10th to 90th<b id="n2range">&ndash;</b></span>
   </div>
+  <div class="prog"><i id="n1bar"></i></div>
   <div class="controls">
     <label><span class="vlabel">Evaluations: <span id="n1rval">120</span></span>
       <input id="n1r" type="range" min="40" max="300" step="20" value="120" /></label>
@@ -247,7 +248,9 @@
     <button data-n="25">25 iterations</button>
     <button data-n="100">100</button>
     <button data-n="400">400</button>
+    <span class="plabel" id="prun"></span>
   </div>
+  <div class="prog"><i id="pbar"></i></div>
 
   <div class="cols">
     <div>
@@ -257,12 +260,24 @@
       </div>
       <p class="figcap">Accepted states are the line. Faint crosses are proposals that were rejected.</p>
       <div class="fig">
+        <svg id="p4" viewBox="0 0 700 90" role="img" aria-label="One mark per iteration on the same axis: upward for an accepted proposal, downward and faint for a rejected one, so runs of rejections show as gaps."></svg>
+      </div>
+      <p class="figcap">Every decision, on the same axis. A gap is a plateau.</p>
+      <div class="fig">
         <svg id="p2" viewBox="0 0 700 230" role="img" aria-label="The stored log-posterior of the chain against iteration, flat while the chain is stuck, with the fresh estimate of each proposal drawn as a point."></svg>
       </div>
       <p class="figcap">The stored score is a step function. Every proposal has to beat it, however stale it is.</p>
     </div>
     <div>
       <p class="colhead">this iteration</p>
+      <div class="fig">
+        <svg id="p3" viewBox="0 0 470 240" role="img" aria-label="The particle filter run that scored the current proposal: particle predictions for each day against the observed counts."></svg>
+      </div>
+      <p class="figcap">The filter run behind the number in the ledger. Amber is one particle's prediction for a day, red is the count it was weighted against.</p>
+      <div class="fig">
+        <svg id="p5" viewBox="0 0 470 240" role="img" aria-label="Acceptance rate so far and movement per iteration so far, both against iteration."></svg>
+      </div>
+      <p class="figcap">Both measures as the chain builds them. Acceptance rate says how often it moves, movement says how far.</p>
       <div class="ledger" id="pled"></div>
     </div>
   </div>
@@ -272,15 +287,20 @@
     <span class="chip">accepted<b id="pacc">&ndash;</b></span>
     <span class="chip">stuck for<b id="pplat">&ndash;</b></span>
     <span class="chip">longest plateau<b id="pmax">&ndash;</b></span>
-    <span class="chip">age of the stored estimate<b id="page">&ndash;</b></span>
+    <span class="chip">movement per iteration<b id="pjump">&ndash;</b></span>
+    <span class="chip">R<sub>0</sub> visited<b id="prange">&ndash;</b></span>
   </div>
 
   <div class="prose turn">
     <h4>Your turn</h4>
     <ol>
-      <li>Step through ten iterations at 8 particles and watch the stored score. How old is it by the time something is accepted?</li>
-      <li>Raise the particles to 128 and run 100 iterations. What happens to the acceptance rate and to the longest plateau?</li>
-      <li>Set the proposal scale to a quarter. The acceptance rate rises. Is the chain exploring better?</li>
+      <li>Set the particles to 8 and step through ten iterations one press at a time.
+      The ledger gives the stored score and how many iterations old it is, and the filter panel shows the run each proposal got.
+      How stale is the stored score by the time a proposal beats it?</li>
+      <li>Reset, then run 100 iterations at 8 particles and again at 128, and compare the accepted and longest plateau chips.</li>
+      <li>Now run 100 iterations with the proposal scale at a quarter, and again at two.
+      Compare the acceptance rate, the movement per iteration and the range of R<sub>0</sub> visited.
+      Predict what a smaller step will do to acceptance before you run it.</li>
     </ol>
   </div>
   <details class="prose">
@@ -289,8 +309,10 @@
     Every honest proposal after it has to beat a number that was never the truth, so the chain sits still for tens of iterations, and the age of the stored estimate climbs with it.</p>
     <p>More particles shrink the noise, so fewer lucky values are accepted and the plateaus get shorter.
     The cost per iteration rises in proportion to the particle count, which is the trade the tuning section measures.</p>
-    <p>A small proposal scale raises the acceptance rate and moves the chain nowhere.
-    Acceptance rate on its own is not a diagnostic. What matters is distance covered per unit of computation.</p>
+    <p>Shrinking the proposal does not buy acceptance the way it would with an exact likelihood.
+    Over 300 iterations at 32 particles, averaged across four seeds, acceptance runs 24 per cent at a quarter scale, 31 at a half, 26 at one and 18 at two, while movement per iteration climbs the whole way: 0.003, 0.016, 0.040, 0.077.
+    A tiny step proposes almost the same parameters, so what the sampler is mostly deciding between is two noisy readings of the same likelihood, and the noise sets a ceiling on acceptance that a smaller step cannot lift.
+    The narrow setting therefore gives you the worst of both: no more acceptance, and a chain that has seen a much smaller range of R<sub>0</sub>.</p>
   </details>
 </section>
 
@@ -298,8 +320,12 @@
 <section id="stick">
   <h2>Where the plateaus come from</h2>
   <p class="tagline">A plateau is a state whose likelihood was over-estimated</p>
-  <p class="prose">The same proposals, run twice: once at the particle count in the bar, and once at eight times as many.
-  Every state the noisier chain accepted is then scored again from eight fresh runs at 128 particles, so the value it stored can be compared with what that state is really worth.</p>
+  <p class="prose">A plateau is the chain turning down every proposal for a long stretch.
+  To see where they come from, the chain is run twice on the same proposals: once with the particle count set at the top of the page, and once with eight times as many particles.
+  Only the noise in the likelihood differs between them.</p>
+  <p class="prose">Then every parameter set the noisier chain accepted is measured properly, by running the filter another eight times at 128 particles and averaging.
+  If the value the chain stored when it accepted a state is far above that properly measured value, the chain got a lucky reading.
+  Every later proposal then has to beat a number that was never true, and the chain stops moving until one of them manages it.</p>
 
   <div class="stage">
     <button id="krun">Run both chains</button>
@@ -310,10 +336,17 @@
   <div class="fig">
     <svg id="k1" viewBox="0 0 1120 300" role="img" aria-label="Two traces of R nought against iteration sharing the same proposals, the noisier one shaded where it is stuck, the better one moving freely."></svg>
   </div>
-  <div class="fig">
-    <svg id="k2" viewBox="0 0 1120 250" role="img" aria-label="For each accepted state, the stored log-likelihood estimate minus the average of repeated fresh runs at the same parameters, against the length of the plateau that followed it."></svg>
+  <div class="grid2">
+    <div class="fig">
+      <svg id="k2" viewBox="0 0 560 260" role="img" aria-label="For each accepted state, the stored log-likelihood estimate minus the average of repeated fresh runs at the same parameters, against the length of the plateau that followed it."></svg>
+    </div>
+    <div class="fig">
+      <svg id="k3" viewBox="0 0 560 260" role="img" aria-label="How long the plateaus are at each particle count, as a share of the accepted states falling in each length band."></svg>
+    </div>
   </div>
-  <p class="figcap">Each point is one accepted state. To the right of zero the stored estimate flattered the state, and the plateau that followed is on the vertical axis.</p>
+  <p class="figcap">Each point is one state the noisier chain accepted.
+  Its position left to right is how much the stored value flattered that state, and its height is how many iterations the chain then sat still.
+  Points to the right of the dashed line are lucky readings, and the higher they sit, the longer the chain paid for them.</p>
 
   <div class="readout">
     <span class="chip">acceptance, few particles<b id="kacc1">&ndash;</b></span>
@@ -669,9 +702,10 @@ function meanEstimate(th,J,rng,n){
 function newChain(J,scale,which,seed,start){
   var rng=mulberry32(seed), th=copyTh(start||START);
   var ll=estimate(th,J,rng), lp=logPrior(th);
-  return {J:J, scale:scale, which:which, rng:rng, th:th, ll:ll, lp:lp,
+  return {J:J, scale:scale, which:which, rng:rng, th:th, ll:ll, lp:lp, keep:false,
+          run:null, propRun:null,
           it:0, nacc:0, plateau:0, maxPlateau:0,
-          trace:[th.R_0], score:[lp+ll], props:[], accepts:[],
+          trace:[th.R_0], score:[lp+ll], rate:[], move:[], jsum:0, props:[], accepts:[],
           stage:0, prop:null, propLL:null, propLP:null, logA:null, u:null, ok:null};
 }
 function propose(c){
@@ -681,7 +715,14 @@ function propose(c){
   c.logA=null; c.u=null; c.ok=null; c.stage=1;
 }
 function evaluate(c){
-  c.propLL=isFinite(c.propLP)?estimate(c.prop,c.J,c.rng):-Infinity;
+  if(!isFinite(c.propLP)){ c.propLL=-Infinity; c.propRun=null; c.stage=2; return; }
+  if(c.keep){
+    c.propRun=filterOnce(c.prop,c.J,1+Math.floor(c.rng()*2147483646),"always",1,true);
+    c.propLL=c.propRun.logL;
+  } else {
+    c.propRun=null;
+    c.propLL=estimate(c.prop,c.J,c.rng);
+  }
   c.stage=2;
 }
 function decide(c){
@@ -695,11 +736,16 @@ function decide(c){
     if(c.accepts.length) c.accepts[c.accepts.length-1].plateau=c.plateau;
     if(c.plateau>c.maxPlateau) c.maxPlateau=c.plateau;
     c.th=c.prop; c.ll=c.propLL; c.lp=c.propLP; c.nacc++;
+    if(c.keep) c.run=c.propRun;
     c.accepts.push({it:c.it, th:copyTh(c.th), ll:c.ll, plateau:0});
     c.plateau=0;
   } else c.plateau++;
   c.trace.push(c.th.R_0);
   c.score.push(c.lp+c.ll);
+  c.rate.push(c.nacc/c.it);
+  var d=c.trace[c.it]-c.trace[c.it-1];
+  c.jsum+=d*d;
+  c.move.push(c.jsum/c.it);
   c.stage=3;
 }
 function iterate(c){ propose(c); evaluate(c); decide(c); }
@@ -804,6 +850,11 @@ function runJobs(jobs, onProgress, onDone){
   POOL.ws.forEach(feed);
   if(jobs.length===0) onDone(out);
 }
+/* a button that says what it is doing while it does it */
+function running(btn){
+  if(!btn.dataset.label) btn.dataset.label=btn.textContent;
+  btn.textContent="running…";
+}
 function poolLabel(){
   poolInit();
   return POOL.ready ? ("spread over "+POOL.n+" workers")
@@ -844,10 +895,13 @@ function poolLabel(){
               {kind:"spread",th:th2,J:256,seed:1099,reps:8},
               {kind:"spread",th:th,J:J,seed:4242,reps:R},
               {kind:"spread",th:th2,J:J,seed:5252,reps:R}];
-    runJobs(jobs,null,function(res){
+    var pb=document.getElementById("n1bar");
+    pb.style.width="4%";
+    runJobs(jobs,function(d,t){ pb.style.width=(8+92*d/t).toFixed(0)+"%"; },function(res){
       if(g!==gen) return;
       exact.ll=res[0].mean; exact.ll2=res[1].mean;
       A=res[2].vals; B=res[3].vals;
+      pb.style.width="0%";
       draw(th,th2);
     });
   }
@@ -906,15 +960,63 @@ function poolLabel(){
       bReset=document.getElementById("preset"), note=document.getElementById("pnote");
   var c=null, timer=null, seed=71;
 
-  function build(){ c=newChain(BAR.J,BAR.scale,BAR.which,seed,START); }
+  var s3=document.getElementById("p3");
+  function build(){ c=newChain(BAR.J,BAR.scale,BAR.which,seed,START); c.keep=true; }
+
+  /* what the filter did for the proposal being judged */
+  function drawFilter(){
+    clear(s3);
+    var L=pane(s3,44,16,12,52), YMAX=60, d, i;
+    var xs=lin(0,NDAYS,L.x0,L.x1), ys=lin(0,YMAX,L.y1,L.y0);
+    frame(s3,L,xs,ys,[0,20,40,59],[0,20,40,60],"day","reported cases");
+    var run=(c.stage>=2&&c.propRun)?c.propRun:null;
+    if(!run){
+      tx(s3,{x:(L.x0+L.x1)/2,y:(L.y0+L.y1)/2,"font-size":12.5,fill:"#9ca3af","text-anchor":"middle"},
+         c.stage===1?"run the filter to score this proposal":"propose a parameter set first");
+    } else {
+      var stride=Math.max(1,Math.ceil(c.J/24));
+      for(d=0;d<run.cloud.length;d++){
+        var cl=run.cloud[d]; if(!cl) continue;
+        for(i=0;i<cl.mu.length;i+=stride)
+          add(s3,"circle",{cx:xs(d+1),cy:ys(Math.min(YMAX,cl.mu[i])),r:1.7,
+                           fill:C.part,"fill-opacity":0.3});
+      }
+    }
+    for(d=0;d<NDAYS;d++) diamond(s3,xs(d+1),ys(Math.min(YMAX,OBS[d])),2.6,C.data);
+    if(run)
+      tx(s3,{x:L.x1,y:L.y0+12,"font-size":11.5,fill:"#6b7280","text-anchor":"end"},
+         c.J+" particles, log L̂ = "+run.logL.toFixed(1));
+  }
   function stopPlay(){ if(timer){ clearInterval(timer); timer=null; bPlay.textContent="Play"; } }
   function step(){
     if(c.stage===0||c.stage===3) propose(c);
     else if(c.stage===1) evaluate(c);
     else decide(c);
   }
-  function runN(n){ stopPlay(); var i; if(c.stage!==3&&c.it>0) decide(c);
-    for(i=0;i<n;i++) iterate(c); draw(); }
+  var running=false;
+  function runN(n){
+    if(running) return;
+    stopPlay();
+    if(c.stage!==3 && c.it>0) decide(c);
+    running=true;
+    var left=n, total=n, pb=document.getElementById("pbar"),
+        rl=document.getElementById("prun"), btns=document.querySelectorAll('#step .presets button');
+    Array.prototype.forEach.call(btns,function(b){ b.disabled=true; });
+    bStep.disabled=true; bPlay.disabled=true;
+    (function chunk(){
+      var t0=Date.now();
+      while(left>0 && Date.now()-t0<80){ iterate(c); left--; }
+      pb.style.width=(100*(total-left)/total).toFixed(0)+"%";
+      rl.textContent="running, "+(total-left)+" of "+total+" iterations";
+      draw();
+      if(left>0) setTimeout(chunk,0);
+      else {
+        running=false; pb.style.width="0%"; rl.textContent="";
+        Array.prototype.forEach.call(btns,function(b){ b.disabled=false; });
+        bPlay.disabled=false; draw();
+      }
+    })();
+  }
 
   function fmt(v,d){ return isFinite(v)?v.toFixed(d===undefined?2:d):"−∞"; }
   function ledger(){
@@ -995,11 +1097,69 @@ function poolLabel(){
     document.getElementById("pacc").textContent=c.it?(100*c.nacc/c.it).toFixed(0)+"%":"–";
     document.getElementById("pplat").textContent=c.plateau+" iterations";
     document.getElementById("pmax").textContent=c.maxPlateau;
-    document.getElementById("page").textContent=c.plateau+" iterations";
+    var jump=0, lo=Infinity, hi=-Infinity, k;
+    for(k=0;k<c.trace.length;k++){
+      if(k) jump+=Math.pow(c.trace[k]-c.trace[k-1],2);
+      if(c.trace[k]<lo) lo=c.trace[k];
+      if(c.trace[k]>hi) hi=c.trace[k];
+    }
+    document.getElementById("pjump").textContent=
+      c.it?(jump/c.it).toFixed(3)+" in R₀²":"–";
+    document.getElementById("prange").textContent=
+      c.it?lo.toFixed(2)+" to "+hi.toFixed(2):"–";
+    drawFilter(); drawDecisions(); drawRates();
     ledger();
     pills();
     label();
   }
+  /* every decision, on the trace's own axis */
+  function drawDecisions(){
+    var s4=document.getElementById("p4");
+    clear(s4);
+    var L=pane(s4,54,14,14,30), n=Math.max(25,c.it+1), i;
+    var xs=lin(0,n,L.x0,L.x1), mid=(L.y0+L.y1)/2;
+    add(s4,"line",{x1:L.x0,y1:mid,x2:L.x1,y2:mid,stroke:"#e2e8f0","stroke-width":1});
+    for(i=0;i<c.props.length;i++){
+      var x=xs(c.props[i].it), ok=c.props[i].ok;
+      add(s4,"line",{x1:x,y1:mid,x2:x,y2:ok?L.y0:L.y1,stroke:ok?C.fc:C.data,
+        "stroke-width":ok?1.8:1,"stroke-opacity":ok?0.95:0.35});
+    }
+    tx(s4,{x:L.x0,y:L.y0-2,"font-size":11,fill:C.fc},"accepted");
+    tx(s4,{x:L.x0,y:L.y1+11,"font-size":11,fill:C.data},"rejected");
+    if(c.plateau>0)
+      tx(s4,{x:L.x1,y:L.y0+10,"font-size":11.5,fill:"#6b7280","text-anchor":"end"},
+         "stuck for "+c.plateau);
+  }
+
+  /* how often it moves, and how far, as the chain builds them */
+  function drawRates(){
+    var s5=document.getElementById("p5");
+    clear(s5);
+    var L=pane(s5,50,20,44,52), n=Math.max(25,c.it), i;
+    var xs=lin(0,n,L.x0,L.x1), ys=lin(0,1,L.y1,L.y0);
+    frame(s5,L,xs,ys,[0,Math.round(n/2),n],[0,0.25,0.5,0.75,1],"iteration","acceptance rate",
+          function(v){ return (100*v).toFixed(0)+"%"; });
+    var mmax=0.001;
+    for(i=0;i<c.move.length;i++) if(c.move[i]>mmax) mmax=c.move[i];
+    var ysm=lin(0,mmax*1.2,L.y1,L.y0);
+    [0.5,1].forEach(function(f){
+      var v=mmax*1.2*f;
+      tx(s5,{x:L.x1+6,y:ysm(v)+4,"font-size":11,fill:C.part},
+         v<0.01?v.toExponential(0):v.toFixed(3));
+    });
+    tx(s5,{x:L.x1+38,y:(L.y0+L.y1)/2,"font-size":12,fill:C.part,"text-anchor":"middle",
+           transform:"rotate(90 "+(L.x1+38)+" "+((L.y0+L.y1)/2)+")"},"movement per iteration");
+    var pa=[],pm=[];
+    for(i=0;i<c.rate.length;i++){
+      pa.push([xs(i+1),ys(c.rate[i])]);
+      pm.push([xs(i+1),ysm(c.move[i])]);
+    }
+    poly(s5,pm,C.part,2,0.9); poly(s5,pa,C.fc,2.4,1);
+    if(!c.rate.length)
+      tx(s5,{x:(L.x0+L.x1)/2,y:(L.y0+L.y1)/2,"font-size":12.5,fill:"#9ca3af",
+             "text-anchor":"middle"},"decide an iteration to start these");
+  }
+
   function pills(){
     var st=c.stage===3?0:c.stage;
     [0,1,2,3].forEach(function(k){
@@ -1038,32 +1198,45 @@ function poolLabel(){
   }
   function start(){
     if(busy) return;
-    busy=true; btn.disabled=true; pts=[]; low=null; high=null;
+    busy=true; btn.disabled=true; running(btn); pts=[]; low=null; high=null;
     var J1=barJ(), J2=Math.min(256,J1*8), seed=(Date.now()%90000)+11;
     var jobs=[{kind:"chain",J:J1,scale:BAR.scale,which:BAR.which,seed:seed,n:N,start:START},
               {kind:"chain",J:J2,scale:BAR.scale,which:BAR.which,seed:seed,n:N,start:START}];
-    runJobs(jobs,function(d,t){ bar.style.width=(50*d/t).toFixed(0)+"%"; },function(res){
+    runJobs(jobs,function(d,t,partial){
+      bar.style.width=(50*d/t).toFixed(0)+"%";
+      if(partial[0]&&!low){ low=partial[0]; draw(); }
+      if(partial[1]&&!high){ high=partial[1]; draw(); }
+    },function(res){
       low=res[0]; high=res[1];
       draw();
       /* score every accepted state properly, to see what was really there */
       var jobs2=low.accepts.map(function(a,i){
         return {kind:"spread", th:a.th, J:REF, seed:seed+7+i*131, reps:8};
       });
-      runJobs(jobs2,function(d,t){ bar.style.width=(50+50*d/t).toFixed(0)+"%"; },function(res2){
+      runJobs(jobs2,function(d,t,partial){
+        bar.style.width=(50+50*d/t).toFixed(0)+"%";
+        pts=[];
+        for(var q=0;q<partial.length;q++) if(partial[q])
+          pts.push({excess:low.accepts[q].ll-partial[q].mean, plateau:low.accepts[q].plateau,
+                    it:low.accepts[q].it});
+        draw();
+      },function(res2){
         pts=res2.map(function(r,i){ return {excess:low.accepts[i].ll-r.mean,
-                                            plateau:low.accepts[i].plateau}; });
-        busy=false; btn.disabled=false; draw();
+                                            plateau:low.accepts[i].plateau,
+                                            it:low.accepts[i].it}; });
+        busy=false; btn.disabled=false; if(btn.dataset.label) btn.textContent=btn.dataset.label; draw();
       });
     });
   }
 
   function draw(){
-    var i;
-    clear(s1); clear(s2);
-    if(!low) return;
+    var i, s3=document.getElementById("k3");
+    clear(s1); clear(s2); clear(s3);
+    if(!low && !high) return;
     var L=pane(s1,58,20,16,62), lo=2, hi=11;
-    function span(c){ for(i=0;i<c.trace.length;i++){ if(c.trace[i]<lo) lo=c.trace[i]-0.2;
-      if(c.trace[i]>hi) hi=c.trace[i]+0.2; } }
+    function span(c){ if(!c) return;
+      for(i=0;i<c.trace.length;i++){ if(c.trace[i]<lo) lo=c.trace[i]-0.2;
+        if(c.trace[i]>hi) hi=c.trace[i]+0.2; } }
     span(low); span(high);
     var xs=lin(0,N,L.x0,L.x1), ys=lin(lo,hi,L.y1,L.y0);
     frame(s1,L,xs,ys,[0,50,100,150,200,250],[2,4,6,8,10],"iteration","R₀");
@@ -1071,11 +1244,24 @@ function poolLabel(){
       var p=[],j; for(j=0;j<c.trace.length;j++) p.push([xs(j),ys(c.trace[j])]);
       poly(s1,p,col,wid,op);
     }
-    trace(high,C.w,1.8,0.8); trace(low,C.fc,2.2,1);
-    tx(s1,{x:L.x0+4,y:L.y0-6,"font-size":12,"font-weight":700,fill:C.fc},
+    if(high) trace(high,C.w,1.8,0.8);
+    if(low) trace(low,C.fc,2.2,1);
+    /* once the rescoring is in, mark the stretches a lucky reading paid for */
+    for(i=0;i<pts.length;i++){
+      if(pts[i].excess<=1 || pts[i].plateau<3) continue;
+      var a=xs(pts[i].it), b2=xs(Math.min(N,pts[i].it+pts[i].plateau));
+      add(s1,"line",{x1:a,y1:L.y1-6,x2:b2,y2:L.y1-6,stroke:C.data,"stroke-width":4,
+                     "stroke-opacity":0.55,"stroke-linecap":"round"});
+    }
+    if(pts.length)
+      tx(s1,{x:L.x1,y:L.y1-12,"font-size":11.5,fill:C.data,"text-anchor":"end"},
+         "red bars: stuck after a reading that flattered the state");
+    if(low) tx(s1,{x:L.x0+4,y:L.y0-6,"font-size":12,"font-weight":700,fill:C.fc},
        low.J+" particles");
-    tx(s1,{x:L.x0+130,y:L.y0-6,"font-size":12,fill:C.w},high.J+" particles, same proposals");
+    if(high) tx(s1,{x:L.x0+130,y:L.y0-6,"font-size":12,fill:C.w},
+       high.J+" particles, same proposals");
 
+    if(!low) return;
     var L2=pane(s2,58,20,16,62), mxp=1, mxe=1, mne=-1;
     for(i=0;i<pts.length;i++){
       if(pts[i].plateau>mxp) mxp=pts[i].plateau;
@@ -1085,7 +1271,8 @@ function poolLabel(){
     var xs2=lin(mne-1,mxe+1,L2.x0,L2.x1), ys2=lin(0,mxp*1.1,L2.y1,L2.y0);
     var xt=[Math.round(mne-1),0,Math.round(mxe+1)];
     frame(s2,L2,xs2,ys2,xt,[0,Math.round(mxp/2),mxp],
-          "stored estimate minus a well-resolved value at the same θ","iterations stuck after it");
+          "how much the stored value flattered the state, in log-likelihood",
+          "iterations stuck after it");
     add(s2,"line",{x1:xs2(0),y1:L2.y0,x2:xs2(0),y2:L2.y1,stroke:C.grey,
                    "stroke-width":1.4,"stroke-dasharray":"4 3"});
     for(i=0;i<pts.length;i++)
@@ -1098,6 +1285,39 @@ function poolLabel(){
       for(i=0;i<n2;i++){ var dx=pts[i].excess-sx, dy=pts[i].plateau-sy;
         sxy+=dx*dy; sxx+=dx*dx; syy+=dy*dy; }
     }
+    /* how long the plateaus run at each count */
+    if(!low || !high) return;
+    var L3=pane(s3,54,26,16,62);
+    var BANDS=[1,2,4,8,16,32], lab=["0","1","2-3","4-7","8-15","16-31","32+"];
+    function bandCounts(c){
+      var h=new Array(BANDS.length+1), j, k;
+      for(j=0;j<h.length;j++) h[j]=0;
+      for(j=0;j<c.accepts.length;j++){
+        var pl=c.accepts[j].plateau, b=0;
+        for(k=0;k<BANDS.length;k++) if(pl>=BANDS[k]) b=k+1;
+        h[b]++;
+      }
+      var tot=Math.max(1,c.accepts.length);
+      for(j=0;j<h.length;j++) h[j]/=tot;
+      return h;
+    }
+    var hL=bandCounts(low), hH=bandCounts(high), mxb=0.05;
+    for(i=0;i<hL.length;i++){ if(hL[i]>mxb) mxb=hL[i]; if(hH[i]>mxb) mxb=hH[i]; }
+    var xs3=lin(0,lab.length,L3.x0,L3.x1), ys3=lin(0,mxb*1.12,L3.y1,L3.y0);
+    frame(s3,L3,xs3,ys3,[],[0,mxb/2,mxb],"iterations stuck after an accepted state",
+          "share of accepted states", function(v){ return (100*v).toFixed(0)+"%"; });
+    var bw3=(L3.x1-L3.x0)/lab.length;
+    for(i=0;i<lab.length;i++){
+      tx(s3,{x:L3.x0+(i+0.5)*bw3,y:L3.y1+16,"font-size":11,fill:"#6b7280",
+             "text-anchor":"middle"},lab[i]);
+      add(s3,"rect",{x:L3.x0+i*bw3+bw3*0.12,y:ys3(hL[i]),width:bw3*0.36,
+                     height:L3.y1-ys3(hL[i]),fill:C.fc,"fill-opacity":0.85});
+      add(s3,"rect",{x:L3.x0+i*bw3+bw3*0.52,y:ys3(hH[i]),width:bw3*0.36,
+                     height:L3.y1-ys3(hH[i]),fill:C.w,"fill-opacity":0.85});
+    }
+    tx(s3,{x:L3.x1,y:L3.y0+4,"font-size":11.5,fill:C.fc,"text-anchor":"end"},low.J+" particles");
+    tx(s3,{x:L3.x1,y:L3.y0+20,"font-size":11.5,fill:C.w,"text-anchor":"end"},high.J+" particles");
+
     document.getElementById("kacc1").textContent=(100*low.nacc/N).toFixed(0)+"%";
     document.getElementById("kacc2").textContent=(100*high.nacc/N).toFixed(0)+"%";
     document.getElementById("kmax1").textContent=low.maxPlateau;
@@ -1121,7 +1341,7 @@ function poolLabel(){
     ". Each chain's cost is timed inside its own worker, so it is the cost on one core."; }
   function start(){
     if(busy) return;
-    busy=true; btn.disabled=true; out=[];
+    busy=true; btn.disabled=true; running(btn); out=[];
     var n=+nI.value, seed=(Date.now()%90000)+3, jobs=[];
     COUNTS.forEach(function(J){
       jobs.push({kind:"chain",J:J,scale:BAR.scale,which:BAR.which,seed:seed,n:n,start:START}); });
@@ -1136,7 +1356,7 @@ function poolLabel(){
         return {J:J, acc:c.nacc/n, jump:jump, ms:perIter, sd:sp.sd,
                 maxPlateau:c.maxPlateau, perSec:jump/(perIter/1000)};
       });
-      busy=false; btn.disabled=false; draw();
+      busy=false; btn.disabled=false; if(btn.dataset.label) btn.textContent=btn.dataset.label; draw();
     });
   }
 
@@ -1215,7 +1435,7 @@ function poolLabel(){
   note.textContent="Chains of "+ITER+" iterations at "+FEW+" particles and at "+MANY+", "+poolLabel()+".";
   function start(){
     if(busy) return;
-    busy=true; btn.disabled=true;
+    busy=true; btn.disabled=true; running(btn);
     var jobs=[], i;
     for(i=0;i<4;i++){
       jobs.push({kind:"chain",J:FEW,scale:BAR.scale,which:BAR.which,seed:seed++,n:ITER,start:START});
@@ -1223,7 +1443,7 @@ function poolLabel(){
     }
     runJobs(jobs,function(d,t){ bar.style.width=(100*d/t).toFixed(0)+"%"; },function(res){
       res.forEach(function(c){ (c.J===FEW?few:many).push(c.trace.slice(1)); });
-      busy=false; btn.disabled=false; draw();
+      busy=false; btn.disabled=false; if(btn.dataset.label) btn.textContent=btn.dataset.label; draw();
     });
   }
 
