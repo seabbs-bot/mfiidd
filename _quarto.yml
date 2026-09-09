@@ -62,6 +62,7 @@ format:
       light: cosmo
       dark: solar
     css: styles.css
+    html-math-method: mathml
     link-external-icon: true
     link-external-newwindow: true
     toc: true
