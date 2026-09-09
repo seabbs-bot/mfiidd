@@ -364,6 +364,13 @@ end
 
 report(state_df, "walk in the state")
 report(outer_df, "walk in the sampler")
+
+## the 59 increments are the reason the second arm exists, so their effective
+## sample size is the number that matters most about it
+println("\nthe 59 increments in the outer sampler: min ESS ",
+        round(first(outer_df.increment_min_ess), digits = 1),
+        ", median ESS ", round(first(outer_df.increment_median_ess), digits = 1),
+        ", out of ", nrow(outer_df), " draws")
 ```
 
 ::: {.callout-warning}
@@ -552,7 +559,7 @@ println("days whose 95% envelope contains the constant rate: ",
 ```
 
 That count is the identifiability result drawn as a picture.
-A constant transmission rate sits inside the envelope on every day of the outbreak, so nothing here is evidence that the rate moved.
+A constant transmission rate sits inside the envelope for the whole outbreak, so nothing in this figure is evidence that the rate moved.
 
 The median path is worth reading with more suspicion than it invites.
 It rises through the first wave and falls away afterwards, which is a tidy story about an epidemic that burned through its susceptibles.

@@ -120,6 +120,27 @@ function run_chain(model, seed; n_warmup, n_samples, thinning)
 end
 
 """
+    trim(df)
+
+Keep the seven parameters, and summarise the 59 increments rather than storing
+them. Arm B carries one column per increment, which is around four megabytes of
+CSV for a chain nobody reads the increments of. What is worth keeping about them
+is their effective sample size, so that goes in as two constant columns and the
+columns themselves are dropped.
+"""
+function trim(df)
+    cols = names(df)
+    inc = filter(n -> startswith(n, "ε"), cols)
+    out = select(df, string.(PARAMETERS))
+    if !isempty(inc)
+        e = ess(Chains(Matrix(df[:, inc]), Symbol.(inc)))[:, :ess]
+        out.increment_min_ess .= minimum(e)
+        out.increment_median_ess .= median(e)
+    end
+    return out
+end
+
+"""
     run_and_save(model, name, path, seeds; ...)
 
 Run one chain per seed, stack them with a `chain` column, and save. The wall
@@ -132,8 +153,9 @@ function run_and_save(model, name, path, seeds; n_warmup, n_samples, thinning)
     parts, total = DataFrame[], 0.0
     for (i, seed) in enumerate(seeds)
         df, t, acc = run_chain(model, seed; n_warmup, n_samples, thinning)
-        df.chain .= i
-        push!(parts, df)
+        kept = trim(df)
+        kept.chain .= i
+        push!(parts, kept)
         total += t
         println(
             "  chain $i: $(round(t / 60, digits = 1)) min, " *

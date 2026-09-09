@@ -248,7 +248,9 @@ function simulate_rw_data(
     init_state = [279.0, 0.0, 2.0, 3.0, 0.0, 0.0, 0.0, 0.0],
 )
     ϵ, ν, τ, α = _fixed_rates(θ)
-    s = vcat(collect(Float64.(init_state)), 0.0)
+    ## the eight compartments and nothing else: this simulates forward rather
+    ## than filtering, so there is no incidence slot to carry
+    s = collect(Float64.(init_state))
     logβ = θ[:logβ0]
     lβ, inc, obs = Float64[], Int[], Int[]
     for _ in 1:n_days
