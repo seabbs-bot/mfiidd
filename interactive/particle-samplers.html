@@ -211,7 +211,7 @@
 <!-- ============ PGAS ============ -->
 <section id="pgas">
   <h2>Ancestor sampling</h2>
-  <p class="tagline">Repair the reference path's past instead of copying it</p>
+  <p class="tagline">Repair the reference path's past instead of copying it, where the model allows it</p>
   <div class="fig">
     <svg id="d3" viewBox="0 0 1120 300" role="img" aria-label="Schematic of ancestor sampling: at each step the reference particle is given a new ancestor drawn in proportion to the weight of each candidate times the probability of moving from that candidate to the reference state."></svg>
   </div>
@@ -258,10 +258,14 @@
     <span class="plabel" id="d5cap" style="font-size:14px; color:var(--ink)"></span>
   </div>
   <div class="prose">
-    <p>Both a guided proposal and the auxiliary filter need something the bootstrap filter does not: a way to score a state against the coming observation before simulating, and a proposal density to divide by.
-    For SEIT4L you would build both from a deterministic one-day prediction, which is extra code and extra approximation, in exchange for needing fewer particles.
-    Neither changes what the sampler targets, so neither is a source of bias.</p>
-    <p>The Rao-Blackwellised filter is the other member of this family and does not apply.
+    <p>Neither of these runs against the model as it stands, and it is the same obstacle both times.
+    A guided proposal has to divide by its own density, and the auxiliary filter has to score a state against the coming count before propagating.
+    Both call for a transition density, and the Gillespie dynamics implement <code>simulate</code> and nothing else, so both stop at a <code>MethodError</code> rather than at a judgement call.</p>
+    <p>That density is not merely unwritten. For a continuous-time Markov chain the probability of going from one compartment state to another over a whole day is a matrix exponential over every state the population could pass through.
+    A fixed-step approximation, tau-leaping or binomial transitions, would give you one, and would make this whole family available at the cost of simulating an approximation of the model.</p>
+    <p>The bootstrap filter is the one member of the family that never needs it, because the transition density cancels out of its weights and leaves the observation density alone.
+    That is why the course uses it, and why the calibration session buys precision with particles rather than with a better proposal.</p>
+    <p>The Rao-Blackwellised filter is the other member and does not apply for a different reason.
     It integrates out a part of the state that is linear and Gaussian given the rest, and SEIT4L has no such part.</p>
   </div>
 </section>
@@ -271,28 +275,32 @@
   <h2>What would work here</h2>
   <p class="tagline">Checked against the versions this course pins</p>
   <table>
-    <thead><tr><th>Scheme</th><th>In GeneralisedFilters</th><th>Works for SEIT4L</th><th>What it would take</th></tr></thead>
+    <thead><tr><th>Scheme</th><th>In the pinned GeneralisedFilters, 0.4.2</th><th>Runs against SEIT4L</th><th>What stands in the way</th></tr></thead>
     <tbody>
-      <tr><td><b>PMMH</b>, bootstrap filter</td><td><code>BF(N)</code>, used through Turing</td><td>Yes, this is the course</td><td>Nothing. Calibrate the particle count.</td></tr>
-      <tr><td><b>Particle Gibbs</b></td><td><code>ConditionalSMC(BF(N))</code></td><td>Yes</td><td>The parameter update from a complete path. The rate and exposure sums come off a Gillespie path, so this is arithmetic rather than approximation.</td></tr>
-      <tr><td><b>Ancestor sampling</b>, PGAS</td><td><code>ConditionalSMC(BF(N), AncestorSampling())</code></td><td>No, not as the model stands</td><td>A one-day transition density. Gillespie can sample it and not evaluate it. Tau-leaping would supply one.</td></tr>
-      <tr><td><b>Backward simulation</b></td><td><code>ConditionalSMC(BF(N), BackwardSimulation())</code></td><td>No, same reason</td><td>Same transition density.</td></tr>
-      <tr><td><b>Auxiliary filter</b></td><td><code>APF</code></td><td>Yes, with work</td><td>A lookahead weight: how plausible tomorrow's count is from today's state.</td></tr>
-      <tr><td><b>Guided proposal</b></td><td><code>PF(N, proposal)</code></td><td>Yes, with work</td><td>A proposal that uses the day's count, and its density to divide by.</td></tr>
-      <tr><td><b>Rao-Blackwellised</b></td><td><code>RBPF(BF(N), KF())</code></td><td>No</td><td>Nothing to integrate out. SEIT4L has no conditionally linear Gaussian part.</td></tr>
-      <tr><td><b>SMC²</b></td><td>Not provided</td><td>Yes</td><td>Building it. Parallelises across parameter particles and returns the marginal likelihood.</td></tr>
+      <tr><td><b>PMMH</b>, bootstrap filter</td><td><code>BF(N)</code>, through Turing</td><td>Yes, this is the course</td><td>Nothing. Calibrate the particle count.</td></tr>
+      <tr><td><b>Conditioning on a path</b></td><td><code>BF(N)</code> with <code>ref_state</code></td><td>Yes</td><td>Nothing in the filter. Particle Gibbs around it is yours to write, including the parameter update from a complete path.</td></tr>
+      <tr><td><b>Ancestor sampling</b></td><td><code>ancestor_weight</code>, a primitive</td><td>No</td><td>It scores the reference with <code>SSMProblems.logdensity</code> on the dynamics, which Gillespie does not implement.</td></tr>
+      <tr><td><b>Auxiliary filter</b></td><td><code>AuxiliaryParticleFilter(BF(N), RepresentativeStateLookAhead(MeanPredictive()))</code></td><td>No</td><td>The look-ahead needs a predictive density from the dynamics. It fails with a <code>MethodError</code>.</td></tr>
+      <tr><td><b>Guided proposal</b></td><td><code>ParticleFilter(N, proposal)</code></td><td>No</td><td>The importance weight needs the transition density to divide by. Same missing method.</td></tr>
+      <tr><td><b>Rao-Blackwellised</b></td><td><code>RBPF(BF(N), KalmanFilter())</code></td><td>No</td><td>Nothing to integrate out: SEIT4L has no conditionally linear Gaussian part.</td></tr>
+      <tr><td><b>SMC²</b></td><td>Not provided</td><td>Yes</td><td>Building it. It needs only simulation, parallelises across parameter particles, and returns the marginal likelihood.</td></tr>
     </tbody>
   </table>
-  <p class="figcap">GPU work exists as well, in the package's CUDA extension. It resamples on the device and expects the particles in one array, which suits a fixed-step simulator and not a per-particle Gillespie loop.</p>
+  <p class="figcap">The version matters. <code>Manifest.toml</code> resolves GeneralisedFilters 0.4.2, which is what the column above describes.
+  Version 0.5.0 packages several of these differently, adding <code>ConditionalSMC(BF(N))</code> with <code>AncestorSampling()</code> and <code>BackwardSimulation()</code> as refreshments, so the names change even where the obstacle does not.
+  The four "no" rows are not version accidents: they follow from the dynamics implementing <code>simulate</code> and nothing else.
+  Most of this column is checked by running it in <a href="https://github.com/mfiidd/mfiidd/pull/154">pull request 154</a>, which is where the failures above come from.
+  GPU work exists as well, in the package's CUDA extension. It resamples on the device and expects the particles in one array, which suits a fixed-step simulator and not a per-particle Gillespie loop.</p>
 
   <div class="prose key blue">If you want one thing to try next, try particle Gibbs.
-  It is supported by the stack as it stands, the parameter update is exact arithmetic on a path you already simulate, and it removes the filter's noise from the parameter step rather than calibrating around it.
-  Check the path step for the collapse the filter page draws before trusting the early parameters.</div>
+  The piece that has to work inside the filter already does: conditioning on a reference path runs on these dynamics, because forcing one particle down a fixed path needs no density.
+  The sampler around it is yours to write in the pinned version, and the parameter update is exact arithmetic on a path you already simulate, which removes the filter's noise from the parameter step rather than calibrating around it.
+  Check the path step for the collapse the filter page draws before trusting the early parameters, and note that the usual repair for it, ancestor sampling, is the row above that does not run.</div>
 </section>
 
 
 <footer>Built as a teaching aid for the MFIIDD particle MCMC session.
-The verdicts are checked against the versions this course pins: GeneralisedFilters and SSMProblems as they are in the project manifest.
+The verdicts are checked against GeneralisedFilters 0.4.2, which is what <code>Manifest.toml</code> resolves, and the failures come from pull request 154, which ran them.
 The model throughout is SEIT4L simulated by the Gillespie algorithm, fitted to the Tristan da Cunha influenza outbreak of 1971.</footer>
 
 </div>
