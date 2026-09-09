@@ -346,6 +346,10 @@
     <p>Resampling below a threshold fires on the days the weights are most uneven, which is the first wave, and leaves the quiet days alone.
     It buys back some ancestry, because a day without resampling is a day on which no lineage dies.
     The bootstrap filter of the practical does not do this: <code>BF</code> takes a threshold of one, so it resamples at every step.</p>
+    <p>On this data that turns out to be the right default, which is not the usual advice.
+    Measured in Julia over a hundred runs at 256 particles, the standard deviation of the log-likelihood estimate was 0.47 resampling every day, 0.53 at a half threshold, 0.75 at a quarter and 0.87 at a tenth, with no saving in time to show for it.
+    The weights here degenerate fast enough that waiting for the effective sample size to fall costs more in accumulated degeneracy than the skipped resampling saves.
+    Lower the threshold on the slider and watch the effective sample size sag between resamples: that sag is the variance being paid for.</p>
     <p>With 8 particles the running log-likelihood moves by tens of units between runs.
     That is the noise the next session has to sample through, and it is why the number of particles is something to calibrate rather than guess.</p>
   </details>
