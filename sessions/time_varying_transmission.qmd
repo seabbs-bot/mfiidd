@@ -51,6 +51,7 @@ In this session you will:
 2. See concretely why a gradient-based sampler cannot be pointed at a particle filter's likelihood
 3. Measure what the remaining alternative costs, in effective sample size per second
 4. Find the ridge that a random walk on $\beta$ opens up, and see why a one-dimensional profile does not reveal it
+5. Judge a fitted transmission trajectory against what a model with no time variation would have produced
 
 # Setup
 
@@ -137,24 +138,31 @@ println("```julia\n", source_for("seit4l_tvbeta.jl"), "\n```")
 ```
 :::
 
-Carrying the extra state component is nearly free:
+Carrying the extra state component does not change what a filter run costs:
 
 ```{julia}
-θ_rw = Dict(:D_lat => 1.3, :D_inf => 2.0, :α => 0.5, :D_imm => 10.5,
-            :ρ => 0.7, :σ => 0.1, :logβ0 => log(6.0 / 2.0))
 θ_const = Dict(:R_0 => 6.0, :D_lat => 1.3, :D_inf => 2.0, :α => 0.5,
                :D_imm => 10.5, :ρ => 0.7)
+θ_rw = Dict(:D_lat => 1.3, :D_inf => 2.0, :α => 0.5, :D_imm => 10.5,
+            :ρ => 0.7, :σ => 0.0, :logβ0 => log(6.0 / 2.0))
 
-t_rw = minimum(@elapsed(run_filter_rw(θ_rw, flu_tdc.obs, 128)) for _ in 1:10)
 t_const = minimum(
-    @elapsed(run_particle_filter(θ_const, flu_tdc.obs, 128; threaded = true)) for _ in 1:10
+    @elapsed(run_particle_filter(θ_const, flu_tdc.obs, 128; threaded = true)) for _ in 1:20
 )
 println("one filter run at 128 particles")
-println("  constant rate:     $(round(t_const, digits = 4)) s")
-println("  random-walk state: $(round(t_rw, digits = 4)) s")
+println("  constant rate:  $(round(t_const, digits = 4)) s")
+for σ in (0.0, 0.1, 0.2, 0.3)
+    t = minimum(
+        @elapsed(run_filter_rw(merge(θ_rw, Dict(:σ => σ)), flu_tdc.obs, 128)) for _ in 1:20
+    )
+    println("  walk, σ = $σ:   $(round(t, digits = 4)) s")
+end
 ```
 
-The extra work is one Normal draw per particle per day, against the tens of Gillespie events that day already costs.
+The extra work per particle per day is one Normal draw, against the tens of Gillespie events that day already costs, so the two sit in the same place.
+What movement there is comes from $\sigma$ rather than from the extra state component: particles whose rate wanders upwards simulate more events, so a larger $\sigma$ costs a little more.
+Treat these numbers as an order of magnitude rather than a benchmark, because the filter is short enough that whatever else the machine is doing shows up in them.
+
 That is the whole argument for putting the walk in the state, and it is worth noticing how little there is to it.
 
 # The walk in the state
@@ -334,13 +342,24 @@ state_df = CSV.read(datadir("pmmh_tvbeta_state.csv"), DataFrame)
 outer_df = CSV.read(datadir("pmmh_tvbeta_outer.csv"), DataFrame)
 pars = [:R_0, :D_lat, :D_inf, :α, :D_imm, :ρ, :σ]
 
+## stack the chains on the third axis, which is where MCMCChains expects them
+## and what lets it compute an R-hat across them
+function as_chains(df)
+    ids = sort(unique(df.chain))
+    blocks = [Matrix(df[df.chain .== c, pars]) for c in ids]
+    n = minimum(size(b, 1) for b in blocks)
+    return Chains(cat((b[1:n, :] for b in blocks)...; dims = 3), pars)
+end
+
 function report(df, name)
-    e = ess(Chains(Matrix(df[:, pars]), pars))[:, :ess]
+    mc = as_chains(df)
+    e = ess(mc)[:, :ess]
     secs = first(df.wall_seconds)
     println(rpad(name, 22), " draws=", rpad(nrow(df), 7),
             " wall=", rpad(string(round(secs / 60, digits = 1), " min"), 11),
             " min ESS=", rpad(round(minimum(e), digits = 1), 8),
-            " min ESS/s=", round(minimum(e) / secs, digits = 4))
+            " min ESS/s=", rpad(round(minimum(e) / secs, digits = 4), 9),
+            " max R-hat=", round(maximum(skipmissing(rhat(mc)[:, :rhat])), digits = 3))
 end
 
 report(state_df, "walk in the state")
@@ -370,13 +389,17 @@ plot(p1, p2, layout = (1, 2), size = (900, 320))
 ::: {.callout-important}
 ## Where a latent trajectory belongs
 
-A latent quantity with one value per observation has to go in the state when the likelihood comes from a particle filter.
+A quantity with one value per observation that feeds a discrete-event simulator belongs in the state, when the likelihood comes from a particle filter.
 
 The usual reason to prefer parameters over states is that a gradient-based sampler handles hundreds of correlated parameters and a random-walk sampler does not.
-A particle filter takes the gradient away, so that reason evaporates, and what is left is a high-dimensional random walk against a filter that integrates the same quantity out for a few per cent more per run.
+Routing the quantity through a Gillespie simulator takes the gradient away, so that reason evaporates, and what is left is a high-dimensional random walk against a filter that integrates the same quantity out for no extra cost worth measuring.
 
 This is not a limitation of the filter.
 It is the filter's purpose: the reason to run one is that it does the high-dimensional integral you would otherwise have to sample.
+
+The condition matters, so it is worth stating the two ways out rather than leaving them implicit.
+A simulator whose output is a smooth function of the quantity gives the gradient back, and so does conditioning on a complete simulated path instead of integrating over paths, which is what particle Gibbs does.
+Both are in [Going further](#getting-the-gradient-back), and both change the model or the algorithm rather than the sampler.
 :::
 
 # Can these data see σ?
@@ -489,6 +512,72 @@ By the end of the outbreak the fitted random walk implies a mean transmission ra
 That is not a description of anything anyone observed on Tristan da Cunha.
 It is the shape the model takes when a flexible component is free and nothing pins it down.
 
+## What the fitted trajectory looks like
+
+The filter can hand back the trajectory as well as the likelihood.
+`filtered_beta` records every particle and its ancestor, draws one particle in proportion to its final weight, and follows it back, which is the same construction the [particle MCMC session](pmcmc.qmd) uses for filtered incidence.
+Repeating it at a fresh posterior draw each time gives independent paths:
+
+```{julia}
+#| output: false
+Random.seed!(7)
+paths = map(1:100) do _
+    row = state_df[rand(1:nrow(state_df)), :]
+    θ = Dict(:D_lat => row.D_lat, :D_inf => row.D_inf, :α => row.α,
+             :D_imm => row.D_imm, :ρ => row.ρ, :σ => row.σ,
+             :logβ0 => log(row.R_0 / row.D_inf))
+    first(filtered_beta(θ, flu_tdc.obs, 128))
+end
+```
+
+```{julia}
+#| code-fold: true
+#| code-summary: "Plotting code"
+M = exp.(reduce(hcat, paths))
+med = [median(M[t, :]) for t in 1:n_obs]
+lo = [quantile(M[t, :], 0.025) for t in 1:n_obs]
+hi = [quantile(M[t, :], 0.975) for t in 1:n_obs]
+
+plot(flu_tdc.time, med, ribbon = (med .- lo, hi .- med), linewidth = 2,
+     colour = :seagreen, fillalpha = 0.2, label = "smoothed β(t)",
+     xlabel = "Day", ylabel = "β", yscale = :log10,
+     title = "Transmission rate, conditioned on the data")
+hline!([β_const], linestyle = :dash, colour = :black,
+       label = "constant-rate fit")
+```
+
+```{julia}
+println("days whose 95% envelope contains the constant rate: ",
+        count(t -> lo[t] <= β_const <= hi[t], 1:n_obs), " of ", n_obs)
+```
+
+That count is the identifiability result drawn as a picture.
+A constant transmission rate sits inside the envelope on every day of the outbreak, so nothing here is evidence that the rate moved.
+
+The median path is worth reading with more suspicion than it invites.
+It rises through the first wave and falls away afterwards, which is a tidy story about an epidemic that burned through its susceptibles.
+But a smoothed path has been conditioned on the observations, so it moves to track them whether or not the rate varied, in exactly the way the [particle MCMC session](pmcmc.qmd) warns about for filtered incidence.
+
+The way to find out whether that shape means anything is to give the same treatment to data that had no time-varying transmission in them, and see how often the smoother invents as much movement as it found here.
+Take the distance the median path travels, from its lowest point to its highest, as a test statistic, and compare the real value against datasets simulated from the constant-rate fit.
+`scripts/generate_tvbeta_null_check.jl` does this and saves the result:
+
+```{julia}
+null_check = CSV.read(datadir("tvbeta_null_check.csv"), DataFrame)
+observed = only(null_check.statistic[null_check.source .== "observed"])
+null_stats = null_check.statistic[null_check.source .== "simulated"]
+
+println("real data, log range of the smoothed median β: ", round(observed, digits = 2))
+println("constant-rate datasets, median: ", round(median(null_stats), digits = 2),
+        ", range ", round.(extrema(null_stats), digits = 2))
+println("p = ", round(mean(null_stats .>= observed), digits = 3),
+        " over ", length(null_stats), " datasets")
+```
+
+The real outbreak sits inside the null distribution.
+A fair number of epidemics with a genuinely constant transmission rate produce a smoothed trajectory that wanders at least as far.
+So the shape in the figure is not evidence of anything, and the agreement with the $\sigma$ posterior, the ridge and the envelope above is the point: four ways of asking the same question, four times nothing.
+
 ::: {.callout-warning}
 ## A one-dimensional profile cannot find a ridge
 
@@ -569,12 +658,13 @@ The useful question is not "did transmission vary?" but "does transmission have 
 # Learning points
 
 ::: {.callout-tip title="Learning points"}
-- **A time-varying rate in the latent state costs almost nothing** — one extra state component, a few per cent per filter run, and one more parameter for the outer sampler
+- **A time-varying rate in the latent state costs almost nothing** — one extra state component, one Normal draw per particle per day, and one more parameter for the outer sampler
 - **A particle filter's log-likelihood has no gradient**, because a Gillespie simulator selects events by comparison and reports integer counts. At a fixed seed the surface is a step function, so the derivative is zero between the steps and undefined at them
 - **`ForwardDiff.value` turns that into a silent failure.** It lets a gradient-based sampler run on a filter likelihood and return the prior, with no warning
-- **So a quantity with one value per observation belongs in the state.** The usual argument for making it a parameter rests on a gradient that is not there
+- **So a quantity that feeds the simulator belongs in the state.** The usual argument for making it a parameter rests on a gradient that is not there, and getting it back means changing the simulator or the algorithm
 - **A multiplicative random walk on $\beta$ trades against $\beta_0$**, opening a ridge along which the likelihood is nearly flat. The posterior for its scale then follows the priors on the other parameters rather than the data
 - **Checking identifiability one parameter at a time cannot find a ridge**, and a ridge is what a flexible time-varying component creates
+- **A smoothed trajectory is not evidence that anything varied.** It is conditioned on the observations, so it moves to track them. The question to ask is how much movement a model with no time variation produces, and on these data it is about as much
 :::
 
 # Going further
