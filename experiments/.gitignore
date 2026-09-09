@@ -1,0 +1,4 @@
+## Saved chain draws. These run to tens of megabytes and every number taken
+## from them is in the committed `.txt` files beside this. Regenerate with the
+## `bench_*.jl` and `ablation*.jl` scripts.
+*.jld2

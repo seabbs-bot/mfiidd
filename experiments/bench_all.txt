@@ -1,0 +1,248 @@
+threads: 12
+
+spread of the log-likelihood estimate at the posterior mean
+    16 particles: mean  -122.45, sd  9.90, 0.01495 s per run
+    32 particles: mean  -118.46, sd  6.12, 0.01337 s per run
+    64 particles: mean  -116.17, sd  2.16, 0.01921 s per run
+   128 particles: mean  -115.74, sd  0.74, 0.02063 s per run
+   256 particles: mean  -115.63, sd  0.55, 0.02795 s per run
+
+running PMMH, 32 particles, 50000 iterations
+
+========================================================================
+PMMH, 32 particles (plain loop, adaptive RWM)
+  iterations kept: 50000
+  wall clock: 173.2 s
+  seconds per iteration: 0.00346
+------------------------------------------------------------------------
+R_0      ESS     108.4   ESS/s    0.6255
+D_lat    ESS     114.5   ESS/s    0.6607
+D_inf    ESS     108.8   ESS/s    0.6278
+α        ESS     102.1   ESS/s    0.5892
+D_imm    ESS     105.8   ESS/s     0.611
+ρ        ESS     111.3   ESS/s    0.6426
+------------------------------------------------------------------------
+  worst parameter: α
+  ESS/s (worst): 0.5892
+  iterations per effective draw: 489.9
+  time to ESS 400: 11.3 minutes
+========================================================================
+  acceptance: 19.4%
+
+PMMH, 32 particles (plain loop, adaptive RWM) posterior:
+R_0      mean    5.983   sd   0.642   95% [4.953, 7.369]
+D_lat    mean    1.223   sd   0.152   95% [0.989, 1.612]
+D_inf    mean    2.326   sd   0.417   95% [1.505, 2.969]
+α        mean    0.446   sd   0.065   95% [0.356, 0.582]
+D_imm    mean   12.129   sd   1.278   95% [10.135, 14.083]
+ρ        mean    0.657   sd   0.037   95% [0.592, 0.739]
+
+running PMMH, 64 particles, 50000 iterations
+
+========================================================================
+PMMH, 64 particles (plain loop, adaptive RWM)
+  iterations kept: 50000
+  wall clock: 381.5 s
+  seconds per iteration: 0.00763
+------------------------------------------------------------------------
+R_0      ESS     910.8   ESS/s    2.3872
+D_lat    ESS     644.3   ESS/s    1.6888
+D_inf    ESS     520.7   ESS/s    1.3648
+α        ESS     852.3   ESS/s     2.234
+D_imm    ESS     693.7   ESS/s    1.8182
+ρ        ESS     699.2   ESS/s    1.8326
+------------------------------------------------------------------------
+  worst parameter: D_inf
+  ESS/s (worst): 1.3648
+  iterations per effective draw: 96.0
+  time to ESS 400: 4.9 minutes
+========================================================================
+  acceptance: 23.4%
+
+PMMH, 64 particles (plain loop, adaptive RWM) posterior:
+R_0      mean    6.357   sd   1.141   95% [4.355, 8.755]
+D_lat    mean    1.363   sd   0.384   95% [0.685, 2.164]
+D_inf    mean    2.105   sd   0.799   95% [0.748, 3.79]
+α        mean    0.471   sd   0.057   95% [0.354, 0.573]
+D_imm    mean   11.728   sd   1.767   95% [8.521, 15.498]
+ρ        mean    0.691   sd   0.047   95% [0.602, 0.787]
+
+running PMMH, 128 particles, 50000 iterations
+
+========================================================================
+PMMH, 128 particles (plain loop, adaptive RWM)
+  iterations kept: 50000
+  wall clock: 732.3 s
+  seconds per iteration: 0.01465
+------------------------------------------------------------------------
+R_0      ESS     966.5   ESS/s    1.3198
+D_lat    ESS     730.9   ESS/s    0.9981
+D_inf    ESS     687.0   ESS/s    0.9381
+α        ESS    1302.5   ESS/s    1.7786
+D_imm    ESS    1119.9   ESS/s    1.5292
+ρ        ESS    1148.5   ESS/s    1.5683
+------------------------------------------------------------------------
+  worst parameter: D_inf
+  ESS/s (worst): 0.9381
+  iterations per effective draw: 72.8
+  time to ESS 400: 7.1 minutes
+========================================================================
+  acceptance: 23.5%
+
+PMMH, 128 particles (plain loop, adaptive RWM) posterior:
+R_0      mean    6.352   sd   1.142   95% [4.328, 8.787]
+D_lat    mean    1.351   sd   0.403   95% [0.639, 2.175]
+D_inf    mean    2.085   sd   0.809   95% [0.691, 3.735]
+α        mean     0.47   sd   0.054   95% [0.361, 0.571]
+D_imm    mean   11.777   sd   1.821   95% [8.362, 15.444]
+ρ        mean     0.69   sd   0.048   95% [0.6, 0.789]
+
+running particle Gibbs, 32 particles, 15000 iterations
+
+========================================================================
+Particle Gibbs, 32 particles
+  iterations kept: 15000
+  wall clock: 156.9 s
+  seconds per iteration: 0.01046
+------------------------------------------------------------------------
+R_0      ESS      66.4   ESS/s    0.4232
+D_lat    ESS      40.6   ESS/s    0.2587
+D_inf    ESS      37.8   ESS/s    0.2411
+α        ESS     241.6   ESS/s    1.5395
+D_imm    ESS      53.2   ESS/s    0.3392
+ρ        ESS     876.3   ESS/s    5.5832
+------------------------------------------------------------------------
+  worst parameter: D_inf
+  ESS/s (worst): 0.2411
+  iterations per effective draw: 396.5
+  time to ESS 400: 27.7 minutes
+========================================================================
+  parameter-step acceptance: 23.3%
+  path departs from reference at day: median 51, mean 43.0
+  sweeps that changed nothing: 40.3%
+
+Particle Gibbs, 32 particles posterior:
+R_0      mean    6.099   sd   1.201   95% [3.647, 8.525]
+D_lat    mean    1.199   sd   0.382   95% [0.56, 1.924]
+D_inf    mean    2.264   sd   0.863   95% [0.862, 4.189]
+α        mean    0.461   sd   0.056   95% [0.348, 0.562]
+D_imm    mean   11.869   sd   1.717   95% [8.146, 15.133]
+ρ        mean    0.691   sd   0.049   95% [0.6, 0.792]
+
+running particle Gibbs, 64 particles, 15000 iterations
+
+========================================================================
+Particle Gibbs, 64 particles
+  iterations kept: 15000
+  wall clock: 175.2 s
+  seconds per iteration: 0.01168
+------------------------------------------------------------------------
+R_0      ESS     146.4   ESS/s    0.8358
+D_lat    ESS      47.7   ESS/s    0.2723
+D_inf    ESS      42.0   ESS/s    0.2397
+α        ESS     328.7   ESS/s    1.8766
+D_imm    ESS      65.8   ESS/s    0.3758
+ρ        ESS    1402.3   ESS/s     8.006
+------------------------------------------------------------------------
+  worst parameter: D_inf
+  ESS/s (worst): 0.2397
+  iterations per effective draw: 357.3
+  time to ESS 400: 27.8 minutes
+========================================================================
+  parameter-step acceptance: 23.3%
+  path departs from reference at day: median 35, mean 30.9
+  sweeps that changed nothing: 26.0%
+
+Particle Gibbs, 64 particles posterior:
+R_0      mean     6.31   sd     1.2   95% [4.159, 8.844]
+D_lat    mean    1.399   sd   0.422   95% [0.561, 2.217]
+D_inf    mean    1.945   sd   0.726   95% [0.651, 3.506]
+α        mean    0.467   sd   0.059   95% [0.342, 0.573]
+D_imm    mean   11.854   sd   1.917   95% [7.909, 15.84]
+ρ        mean    0.691   sd   0.047   95% [0.6, 0.786]
+
+running particle Gibbs, 128 particles, 15000 iterations
+
+========================================================================
+Particle Gibbs, 128 particles
+  iterations kept: 15000
+  wall clock: 217.7 s
+  seconds per iteration: 0.01451
+------------------------------------------------------------------------
+R_0      ESS     219.2   ESS/s    1.0072
+D_lat    ESS      54.1   ESS/s    0.2483
+D_inf    ESS      52.2   ESS/s    0.2399
+α        ESS     421.4   ESS/s    1.9359
+D_imm    ESS     107.9   ESS/s    0.4955
+ρ        ESS    2009.3   ESS/s    9.2311
+------------------------------------------------------------------------
+  worst parameter: D_inf
+  ESS/s (worst): 0.2399
+  iterations per effective draw: 287.2
+  time to ESS 400: 27.8 minutes
+========================================================================
+  parameter-step acceptance: 23.4%
+  path departs from reference at day: median 2, mean 19.2
+  sweeps that changed nothing: 13.1%
+
+Particle Gibbs, 128 particles posterior:
+R_0      mean     6.27   sd   1.174   95% [4.18, 8.755]
+D_lat    mean    1.234   sd    0.43   95% [0.543, 2.069]
+D_inf    mean    2.305   sd   0.845   95% [0.942, 4.09]
+α        mean    0.464   sd   0.055   95% [0.355, 0.567]
+D_imm    mean   12.033   sd   1.807   95% [8.762, 15.586]
+ρ        mean    0.693   sd   0.049   95% [0.601, 0.793]
+
+running particle Gibbs, 256 particles, 15000 iterations
+
+========================================================================
+Particle Gibbs, 256 particles
+  iterations kept: 15000
+  wall clock: 268.4 s
+  seconds per iteration: 0.0179
+------------------------------------------------------------------------
+R_0      ESS     316.6   ESS/s    1.1795
+D_lat    ESS      65.0   ESS/s    0.2422
+D_inf    ESS      58.6   ESS/s    0.2183
+α        ESS     727.9   ESS/s    2.7117
+D_imm    ESS     142.0   ESS/s    0.5291
+ρ        ESS    2200.3   ESS/s    8.1964
+------------------------------------------------------------------------
+  worst parameter: D_inf
+  ESS/s (worst): 0.2183
+  iterations per effective draw: 256.0
+  time to ESS 400: 30.5 minutes
+========================================================================
+  parameter-step acceptance: 23.4%
+  path departs from reference at day: median 1, mean 11.2
+  sweeps that changed nothing: 6.8%
+
+Particle Gibbs, 256 particles posterior:
+R_0      mean    6.382   sd   1.121   95% [4.338, 8.701]
+D_lat    mean    1.379   sd   0.401   95% [0.63, 2.178]
+D_inf    mean    2.069   sd   0.823   95% [0.766, 3.855]
+α        mean    0.472   sd   0.055   95% [0.361, 0.576]
+D_imm    mean   11.607   sd   1.726   95% [8.427, 15.332]
+ρ        mean    0.692   sd   0.048   95% [0.602, 0.789]
+
+committed PMMH chain posterior:
+R_0      mean    6.358   sd   1.166   95% [4.283, 8.876]
+D_lat    mean    1.331   sd   0.412   95% [0.592, 2.152]
+D_inf    mean    2.143   sd   0.809   95% [0.742, 3.832]
+α        mean    0.472   sd   0.056   95% [0.357, 0.576]
+D_imm    mean   11.769   sd   1.802   95% [8.425, 15.538]
+ρ        mean    0.693   sd   0.048   95% [0.602, 0.789]
+
+
+========================================================================================
+SUMMARY (worst-mixing parameter)
+========================================================================================
+sampler                                       s/iter    worst   ESS/s     min to ESS 400
+PMMH, 32 particles (plain loop, adaptive RWM) 0.00346   α       0.5892    11.3
+PMMH, 64 particles (plain loop, adaptive RWM) 0.00763   D_inf   1.3648    4.9
+PMMH, 128 particles (plain loop, adaptive RWM)0.01465   D_inf   0.9381    7.1
+Particle Gibbs, 32 particles                  0.01046   D_inf   0.2411    27.7
+Particle Gibbs, 64 particles                  0.01168   D_inf   0.2397    27.8
+Particle Gibbs, 128 particles                 0.01451   D_inf   0.2399    27.8
+Particle Gibbs, 256 particles                 0.01790   D_inf   0.2183    30.5
+  Activating project at `~/code/external/mfiidd/.claude/worktrees/agent-ab7b8e938bf30f288`

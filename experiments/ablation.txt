@@ -1,0 +1,67 @@
+threads: 12
+128 particles, 20000 warmup, 30000 kept, one seed
+
+variant                                       s/iter    worst   ESS      iters/eff  accept
+full covariance, RM scale, log/logit          0.00469   D_lat   377.2    79.5       23.5%
+
+full covariance, RM scale, log/logit posterior:
+R_0      mean    6.401   sd   1.168   95% [4.301, 8.921]
+D_lat    mean    1.351   sd    0.41   95% [0.608, 2.189]
+D_inf    mean    2.086   sd   0.808   95% [0.69, 3.777]
+α        mean    0.469   sd   0.053   95% [0.362, 0.567]
+D_imm    mean   11.827   sd   1.852   95% [8.34, 15.533]
+ρ        mean    0.691   sd   0.049   95% [0.598, 0.794]
+diagonal covariance, RM scale, log/logit      0.00535   D_inf   177.3    169.2      23.3%
+
+diagonal covariance, RM scale, log/logit posterior:
+R_0      mean    6.248   sd   1.186   95% [4.193, 8.731]
+D_lat    mean    1.355   sd   0.444   95% [0.563, 2.244]
+D_inf    mean    2.034   sd   0.867   95% [0.579, 3.815]
+α        mean     0.47   sd   0.056   95% [0.353, 0.571]
+D_imm    mean    11.61   sd   1.923   95% [8.099, 15.738]
+ρ        mean    0.693   sd   0.048   95% [0.603, 0.793]
+full covariance, RM scale, constrained scale  0.00480   α       837.1    35.8       23.3%
+
+full covariance, RM scale, constrained scale posterior:
+R_0      mean    6.381   sd   1.169   95% [4.301, 8.761]
+D_lat    mean    1.361   sd   0.409   95% [0.614, 2.181]
+D_inf    mean    2.099   sd   0.812   95% [0.67, 3.812]
+α        mean    0.472   sd   0.056   95% [0.349, 0.576]
+D_imm    mean   11.823   sd   1.812   95% [8.419, 15.685]
+ρ        mean     0.69   sd   0.048   95% [0.6, 0.784]
+RAM, log/logit, adapting throughout           0.00576   D_inf   122.5    244.9      22.5%
+
+RAM, log/logit, adapting throughout posterior:
+R_0      mean    6.327   sd   1.155   95% [4.258, 8.748]
+D_lat    mean     1.42   sd   0.432   95% [0.626, 2.286]
+D_inf    mean    1.959   sd   0.853   95% [0.512, 3.714]
+α        mean    0.471   sd   0.055   95% [0.361, 0.571]
+D_imm    mean   11.753   sd   1.906   95% [8.222, 15.797]
+ρ        mean    0.691   sd   0.049   95% [0.598, 0.789]
+RAM, log/logit, frozen after warmup           0.00498   D_lat   156.1    192.1      21.2%
+
+RAM, log/logit, frozen after warmup posterior:
+R_0      mean    6.301   sd   1.173   95% [4.116, 8.693]
+D_lat    mean    1.336   sd   0.408   95% [0.596, 2.159]
+D_inf    mean    2.115   sd   0.846   95% [0.706, 3.901]
+α        mean    0.471   sd   0.055   95% [0.357, 0.573]
+D_imm    mean    11.68   sd   1.838   95% [8.342, 15.512]
+ρ        mean    0.693   sd   0.049   95% [0.597, 0.793]
+RAM, constrained scale, adapting throughout   0.00073   D_imm   61.6     486.8      0.1%
+
+RAM, constrained scale, adapting throughout posterior:
+R_0      mean     6.52   sd   0.652   95% [5.15, 7.448]
+D_lat    mean    1.621   sd   0.261   95% [1.151, 2.044]
+D_inf    mean    1.657   sd   0.597   95% [0.97, 2.899]
+α        mean    0.464   sd   0.052   95% [0.359, 0.544]
+D_imm    mean   13.008   sd   1.563   95% [10.534, 14.729]
+ρ        mean    0.687   sd   0.044   95% [0.592, 0.772]
+  Activating project at `~/code/external/mfiidd/.claude/worktrees/agent-ab7b8e938bf30f288`
+
+committed PMMH chain posterior:
+R_0      mean    6.358   sd   1.166   95% [4.283, 8.876]
+D_lat    mean    1.331   sd   0.412   95% [0.592, 2.152]
+D_inf    mean    2.143   sd   0.809   95% [0.742, 3.832]
+α        mean    0.472   sd   0.056   95% [0.357, 0.576]
+D_imm    mean   11.769   sd   1.802   95% [8.425, 15.538]
+ρ        mean    0.693   sd   0.048   95% [0.602, 0.789]

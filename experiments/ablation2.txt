@@ -1,0 +1,40 @@
+threads: 12
+128 particles, 20000 warmup, 30000 kept
+
+variant                                       s/iter    worst   ESS      iters/eff  accept
+full cov, RM scale, constrained, seed B       0.00465   D_imm   858.7    34.9       23.4%
+
+full cov, RM scale, constrained, seed B posterior:
+R_0      mean    6.311   sd   1.162   95% [4.285, 8.785]
+D_lat    mean    1.339   sd    0.41   95% [0.571, 2.142]
+D_inf    mean    2.105   sd   0.818   95% [0.69, 3.859]
+α        mean    0.472   sd   0.055   95% [0.359, 0.574]
+D_imm    mean   11.661   sd   1.787   95% [8.124, 15.303]
+ρ        mean    0.694   sd   0.049   95% [0.603, 0.793]
+full cov, RM scale, constrained, seed C       0.00478   ρ       850.4    35.3       23.5%
+
+full cov, RM scale, constrained, seed C posterior:
+R_0      mean    6.362   sd   1.155   95% [4.288, 8.802]
+D_lat    mean    1.357   sd   0.414   95% [0.598, 2.213]
+D_inf    mean    2.121   sd   0.824   95% [0.694, 3.817]
+α        mean    0.474   sd   0.054   95% [0.361, 0.572]
+D_imm    mean   11.707   sd   1.761   95% [8.441, 15.459]
+ρ        mean    0.695   sd   0.049   95% [0.603, 0.793]
+full cov, RM scale, log/logit, seed B         0.00804   D_lat   481.2    62.3       23.3%
+
+full cov, RM scale, log/logit, seed B posterior:
+R_0      mean    6.301   sd   1.144   95% [4.298, 8.758]
+D_lat    mean    1.322   sd   0.417   95% [0.582, 2.146]
+D_inf    mean    2.133   sd   0.798   95% [0.755, 3.817]
+α        mean    0.469   sd   0.054   95% [0.358, 0.57]
+D_imm    mean   11.799   sd   1.812   95% [8.503, 15.541]
+ρ        mean    0.691   sd   0.048   95% [0.596, 0.789]
+RAM given a good initial scale, constrained   0.00493   D_imm   768.0    39.1       22.0%
+
+RAM given a good initial scale, constrained posterior:
+R_0      mean    6.356   sd   1.181   95% [4.238, 8.775]
+D_lat    mean     1.37   sd   0.414   95% [0.615, 2.211]
+D_inf    mean    2.107   sd   0.828   95% [0.668, 3.847]
+α        mean    0.473   sd   0.054   95% [0.359, 0.574]
+D_imm    mean    11.86   sd   1.798   95% [8.451, 15.46]
+ρ        mean    0.695   sd   0.047   95% [0.608, 0.793]

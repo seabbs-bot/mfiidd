@@ -1,0 +1,65 @@
+threads: 12
+
+particle Gibbs, 128 particles, 8000 iterations, varying parameter steps
+θ steps   s/iter    worst   ESS       ESS/s     accept
+1         0.01157   D_inf   19.5      0.2102    21.1%
+10        0.01175   D_inf   24.5      0.2606    22.7%
+200       0.01202   D_inf   28.5      0.2960    23.3%
+1000      0.01270   D_inf   30.7      0.3026    23.4%
+
+PMMH variants, 40000 iterations
+variant                                       s/iter    worst   ESS       ESS/s     min to 400
+128 particles, keeps adapting, seed A         0.01255   D_inf   554.8     1.1049    6.0
+
+128 particles, keeps adapting, seed A posterior:
+R_0      mean    6.369   sd   1.148   95% [4.321, 8.826]
+D_lat    mean    1.342   sd   0.404   95% [0.63, 2.166]
+D_inf    mean    2.102   sd   0.805   95% [0.697, 3.738]
+α        mean    0.471   sd   0.054   95% [0.362, 0.569]
+D_imm    mean   11.795   sd   1.807   95% [8.362, 15.405]
+ρ        mean     0.69   sd   0.049   95% [0.599, 0.789]
+128 particles, adaptation frozen after warmup 0.00553   D_lat   452.4     2.0439    3.3
+
+128 particles, adaptation frozen after warmup posterior:
+R_0      mean    6.309   sd    1.19   95% [4.219, 8.923]
+D_lat    mean    1.315   sd   0.416   95% [0.576, 2.184]
+D_inf    mean    2.128   sd   0.784   95% [0.704, 3.731]
+α        mean    0.471   sd   0.055   95% [0.355, 0.57]
+D_imm    mean   11.687   sd   1.856   95% [8.312, 15.574]
+ρ        mean    0.692   sd    0.05   95% [0.603, 0.799]
+128 particles, keeps adapting, seed B         0.00530   D_lat   508.7     2.3975    2.8
+
+128 particles, keeps adapting, seed B posterior:
+R_0      mean    6.322   sd    1.15   95% [4.317, 8.784]
+D_lat    mean    1.336   sd   0.419   95% [0.574, 2.173]
+D_inf    mean    2.118   sd    0.81   95% [0.738, 3.813]
+α        mean    0.468   sd   0.055   95% [0.353, 0.571]
+D_imm    mean   11.856   sd   1.865   95% [8.508, 15.752]
+ρ        mean    0.692   sd   0.048   95% [0.599, 0.789]
+64 particles, keeps adapting, seed B          0.00363   D_lat   230.1     1.5827    4.2
+
+64 particles, keeps adapting, seed B posterior:
+R_0      mean     6.28   sd   1.144   95% [4.278, 8.792]
+D_lat    mean    1.338   sd   0.419   95% [0.591, 2.162]
+D_inf    mean    2.094   sd   0.848   95% [0.636, 3.894]
+α        mean    0.471   sd   0.057   95% [0.343, 0.577]
+D_imm    mean   11.721   sd   1.849   95% [8.082, 15.378]
+ρ        mean    0.694   sd   0.046   95% [0.606, 0.789]
+96 particles, keeps adapting, seed A          0.00438   D_lat   438.8     2.5034    2.7
+
+96 particles, keeps adapting, seed A posterior:
+R_0      mean    6.314   sd   1.123   95% [4.25, 8.805]
+D_lat    mean    1.312   sd   0.402   95% [0.593, 2.13]
+D_inf    mean    2.175   sd   0.782   95% [0.791, 3.822]
+α        mean    0.471   sd   0.054   95% [0.36, 0.571]
+D_imm    mean   11.774   sd   1.791   95% [8.536, 15.578]
+ρ        mean    0.694   sd   0.047   95% [0.604, 0.792]
+  Activating project at `~/code/external/mfiidd/.claude/worktrees/agent-ab7b8e938bf30f288`
+
+committed PMMH chain posterior:
+R_0      mean    6.358   sd   1.166   95% [4.283, 8.876]
+D_lat    mean    1.331   sd   0.412   95% [0.592, 2.152]
+D_inf    mean    2.143   sd   0.809   95% [0.742, 3.832]
+α        mean    0.472   sd   0.056   95% [0.357, 0.576]
+D_imm    mean   11.769   sd   1.802   95% [8.425, 15.538]
+ρ        mean    0.693   sd   0.048   95% [0.602, 0.789]

@@ -1,0 +1,39 @@
+  Activating project at `~/code/external/mfiidd/.claude/worktrees/agent-ab7b8e938bf30f288`
+threads: 12
+particles: 128, warmup: 20000, samples: 100000
+acceptance rate: 18.2%
+
+========================================================================
+PMMH (bootstrap filter, 128 particles, RAM)
+  iterations kept: 100000
+  wall clock: 1672.5 s
+  seconds per iteration: 0.01672
+------------------------------------------------------------------------
+R_0      ESS    1130.8   ESS/s    0.6761
+D_lat    ESS     405.1   ESS/s    0.2422
+D_inf    ESS     438.6   ESS/s    0.2622
+α        ESS    2239.2   ESS/s    1.3389
+D_imm    ESS    2614.6   ESS/s    1.5633
+ρ        ESS    2252.1   ESS/s    1.3465
+------------------------------------------------------------------------
+  worst parameter: D_lat
+  ESS/s (worst): 0.2422
+  iterations per effective draw: 246.9
+  time to ESS 400: 27.5 minutes
+========================================================================
+
+PMMH posterior:
+R_0      mean    6.367   sd   1.174   95% [4.251, 8.832]
+D_lat    mean    1.355   sd   0.425   95% [0.582, 2.218]
+D_inf    mean    2.105   sd   0.838   95% [0.623, 3.872]
+α        mean    0.472   sd   0.055   95% [0.357, 0.576]
+D_imm    mean   11.772   sd   1.849   95% [8.297, 15.647]
+ρ        mean    0.693   sd   0.049   95% [0.601, 0.791]
+
+committed chain posterior:
+R_0      mean    6.358   sd   1.166   95% [4.283, 8.876]
+D_lat    mean    1.331   sd   0.412   95% [0.592, 2.152]
+D_inf    mean    2.143   sd   0.809   95% [0.742, 3.832]
+α        mean    0.472   sd   0.056   95% [0.357, 0.576]
+D_imm    mean   11.769   sd   1.802   95% [8.425, 15.538]
+ρ        mean    0.693   sd   0.048   95% [0.602, 0.789]
