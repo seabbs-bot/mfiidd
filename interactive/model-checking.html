@@ -161,9 +161,10 @@
 
 <!-- ============ PRIOR PREDICTIVE ============ -->
 <section id="prior">
-  <h2>Vague on the parameter is not vague on the outcome</h2>
-  <p class="tagline">The push-forward through the model is the whole point</p>
-  <p>A flat prior on <i>R</i><sub>0</sub> looks like an admission of ignorance. Push it through the SIR model and it stops being flat. The map from <i>R</i><sub>0</sub> to attack rate saturates: once <i>R</i><sub>0</sub> is above about 4 the epidemic infects essentially the whole island, so most of a wide prior piles up on the same outcome. The map to peak timing compresses the other way, because the growth rate <i>&beta;</i> &minus; <i>&nu;</i> is (<i>R</i><sub>0</sub> &minus; 1) / <i>D</i><sub>inf</sub> and the time to the peak falls roughly like 1 / (<i>R</i><sub>0</sub> &minus; 1).</p>
+  <h2>What a uniform prior asserts</h2>
+  <p class="tagline">Uniform(1, 20) says an R<sub>0</sub> of 19 is exactly as plausible as one of 3</p>
+  <p>A uniform prior reads as an admission of ignorance. It is not one. Uniform(1, 20) on <i>R</i><sub>0</sub> puts as much weight in the tails as at the centre, so an <i>R</i><sub>0</sub> of 19 is held exactly as plausible as an <i>R</i><sub>0</sub> of 3. That is a specific claim about relative plausibility, and for influenza it is one almost nobody would defend.</p>
+  <p>A prior predictive check makes the claim visible on a scale you can judge. The map from <i>R</i><sub>0</sub> to attack rate saturates: once <i>R</i><sub>0</sub> is above about 4 the epidemic infects essentially the whole island, so most of a wide prior lands on the same outcome. The map to peak timing compresses the other way, because the growth rate <i>&beta;</i> &minus; <i>&nu;</i> is (<i>R</i><sub>0</sub> &minus; 1) / <i>D</i><sub>inf</sub> and the time to the peak falls roughly like 1 / (<i>R</i><sub>0</sub> &minus; 1).</p>
   <p>The left panel is the prior you set. The right panel is what that prior implies about an outcome you can judge. Change the prior and watch the two move differently.</p>
 
   <div class="legend">
@@ -203,7 +204,7 @@
     <span class="chip">P(peak within 5 days) = <b id="ppPDlo">—</b></span>
   </div>
   <p class="figcap">300 draws from the prior, each solved with a fixed-step Runge&ndash;Kutta scheme; the lower panel shows the first 80 incidence curves. The reporting rate is held at 1 here so that the outcome is a property of the epidemic and not of the surveillance.</p>
-  <div class="key amber">Start on <b>Uniform(1, 20)</b>. The chips report P(attack rate &ge; 90%) = <b class="live" id="ppF1">—</b> and P(peak within five days) = <b class="live" id="ppF2">—</b>. That prior is not humble about influenza on Tristan da Cunha. It asserts that the island was almost certainly wiped through in under a week. Switch to the <b>influenza-like</b> prior and the same two numbers fall to <b class="live" id="ppF3">—</b> and <b class="live" id="ppF4">—</b>, while the median peak moves from day <b class="live" id="ppF5">—</b> to day <b class="live" id="ppF6">—</b>.</div>
+  <div class="key amber">Start on <b>Uniform(1, 20)</b>. The chips report P(attack rate &ge; 90%) = <b class="live" id="ppF1">—</b> and P(peak within five days) = <b class="live" id="ppF2">—</b>. The weight the uniform puts in its upper tail is what produces those numbers: most of the range implies an island wiped through in under a week. Switch to the <b>influenza-like</b> prior and the same two numbers fall to <b class="live" id="ppF3">—</b> and <b class="live" id="ppF4">—</b>, while the median peak moves from day <b class="live" id="ppF5">—</b> to day <b class="live" id="ppF6">—</b>.</div>
   <p>The vertical axis of the curve panel is left alone deliberately. Capping it makes the picture tidier and hides the trajectories that make the point.</p>
 </section>
 
@@ -245,6 +246,38 @@
   <p class="figcap">Each redraw runs a fresh componentwise random-walk Metropolis chain in the browser: 3000 iterations, the first 1000 discarded, proposal scales adapted during that burn-in towards an acceptance rate near 0.3. 400 thinned draws are then pushed through the simulator and the Poisson observation model. The seed is fixed, so the same slider position always gives the same picture.</p>
   <div class="key">At <b>k = 20</b> the fit is drawn to a fast, early epidemic. The posterior mean <i>R</i><sub>0</sub> is <b class="live" id="pcA">—</b> with an infectious period of <b class="live" id="pcB">—</b> days, neither of which is plausible for influenza. Inside the window the 90% interval covers <b class="live" id="pcC">—</b> of the fitted days. Outside it, coverage falls to <b class="live" id="pcD">—</b>, and the replicate medians add up to <b class="live" id="pcE">—</b> cases after day 20 against <b class="live" id="pcF">—</b> reported. The in-window picture on its own would not have told you that.</div>
   <div class="key blue">Fitting to all 59 days does not rescue it. The posterior settles at <i>R</i><sub>0</sub> = <b class="live" id="pcG">—</b> with an infectious period of <b class="live" id="pcH">—</b> days, splitting the difference between the two waves, and the 90% interval then covers only <b class="live" id="pcI">—</b> of the days it was fitted to. A posterior predictive check that fails on the data used to fit is a strong signal, precisely because the check was tilted in the model's favour.</div>
+
+  <h3>Latent quantities</h3>
+  <p>The figure above holds the model against counts, because counts are what was recorded. The same draws also carry the quantities nothing recorded: the <i>S</i>, <i>I</i> and <i>R</i> trajectories, and anything built from them. The one worth looking at here is the effective reproduction number, <i>R<sub>t</sub></i> = <i>R</i><sub>0</sub> <i>S</i>(<i>t</i>) / <i>N</i>, the average number of infections one case produces at time <i>t</i> once the susceptible pool has been drawn down.</p>
+  <p>It is a function of the parameters and the trajectory, so it is available from prior draws and posterior draws alike, and one line of code produces both. Nothing observes it, so it can never be checked against data. What it offers instead is a scale that is easier to reason about than daily counts: above 1 the outbreak grows, below 1 it declines.</p>
+
+  <div class="legend">
+    <span><i class="swbox" style="background:var(--true);opacity:.45"></i> prior 50% and 90% intervals</span>
+    <span><i class="swbox" style="background:var(--fc);opacity:.45"></i> posterior 50% and 90% intervals</span>
+    <span><i class="swatch" style="border-color:var(--now);border-top-style:dashed"></i> R<sub>t</sub> = 1</span>
+  </div>
+
+  <div class="fig">
+    <svg id="rtSvg" viewBox="0 0 720 400" role="img" aria-label="The effective reproduction number over the outbreak, with the interval implied by the priors drawn behind the interval implied by the posterior, and a marker on the selected day."></svg>
+  </div>
+  <div class="controls">
+    <label><span class="vlabel">Day: <span id="rtDayVal">0</span></span>
+      <input id="rtDay" type="range" min="0" max="59" step="1" value="0"></label>
+  </div>
+  <div class="presets" id="rtScale">
+    <span class="plabel">vertical axis:</span>
+    <button data-y="shared" class="active">fits the prior</button>
+    <button data-y="post">fits the posterior</button>
+  </div>
+  <div class="readout">
+    <span class="chip">prior 90% interval = <b id="rtPriorI">&mdash;</b></span>
+    <span class="chip" style="border-left:4px solid var(--fc);padding-left:10px">posterior 90% interval = <b id="rtPostI">&mdash;</b></span>
+    <span class="chip">width ratio = <b id="rtRatio">&mdash;</b></span>
+    <span class="chip" style="border-left:4px solid var(--now);padding-left:10px">posterior median crosses 1 on day <b id="rtCross">&mdash;</b></span>
+  </div>
+  <p class="figcap">200 draws from the session priors and 200 from the posterior fitted to all 59 days, each solved and mapped through <i>R</i><sub>0</sub> <i>S</i>(<i>t</i>) / <i>N</i>. Bands are pointwise 50% and 90% intervals and the solid lines are pointwise medians. Values above the axis maximum are drawn at the top edge, so on the second axis setting the prior band is clipped rather than flat.</p>
+
+  <div class="key blue">On day 0 the prior 90% interval for <i>R<sub>t</sub></i> is <b class="live" id="rtA">&mdash;</b> and the posterior 90% interval is <b class="live" id="rtB">&mdash;</b>, a width ratio of <b class="live" id="rtC">&mdash;</b>. The two bands are the same object computed by the same function. Only the source of <i>&theta;</i> differs, which is the distinction the whole page turns on.</div>
 </section>
 
 <!-- ============ PREDICTIVE P-VALUES ============ -->
@@ -352,6 +385,16 @@
   <p>The right-hand panel shows why chasing that configuration is hopeless anyway. Press <b>push it as far as it goes</b>. The model puts <b class="live" id="cP1">—</b> cases on the first day and is finished within a week. It buys the total by destroying the shape.</p>
 
   <div class="key blue"><b>A parameter problem or a structure problem.</b> A parameter problem moves when you move the parameters. This one does not, so no prior, no sampler and no observation model will fix it. Reported cases exceed the population because islanders were infected twice, which a single SIR wave cannot represent. Changing Poisson to negative binomial widens the interval around a single-wave trajectory and makes the miss look less surprising. It does not add a second wave. The SEITL model in the next session adds a temporary immune state that drains back into susceptible, which does.</div>
+
+  <h3>Where to look when a check fails</h3>
+  <p>A failed check says something is wrong without saying what. Work through the model in this order.</p>
+  <ol>
+    <li><b>The priors.</b> Are they excluding the region the data prefer? This costs nothing to check, because a prior predictive check needs no fit.</li>
+    <li><b>The structure.</b> A feature the model never reproduces at any parameter value belongs here: waning immunity, age structure, transmission that varies over time.</li>
+    <li><b>The data.</b> Are the observations what you think they are? Case definitions change part-way through an outbreak, and a reporting artefact can look exactly like a missing mechanism.</li>
+    <li><b>The observation model.</b> Overdispersion, under-reporting, reporting delays, which the observation models session takes up in full.</li>
+  </ol>
+  <p>The order is a default rather than a rule. What settles the question is whether the failure is about spread or about shape. Spread that grows with the fitted value is heteroscedasticity, and it is a variance problem. Variance is what the observation model controls, so a negative binomial in place of the Poisson is the usual first move. The failure on this page is about shape, and no observation model reaches it.</p>
 </section>
 
 <!-- ============ SBC ============ -->
@@ -365,6 +408,7 @@
     <br>r = #{ l : &theta;<sup>(l)</sup> &lt; &theta;<sup>true</sup> } &nbsp;&nbsp;<span class="cmt">/* uniform on {0, …, L} if the inference is correct */</span></div>
 
   <p>The three failures have three signatures, and they are legible once you know that the rank counts how many posterior draws fall below the truth. A posterior that is <b>too narrow</b> misses the truth on one side or the other, so ranks pile up at both ends and the histogram is U-shaped. A posterior that is <b>too wide</b> brackets the truth too comfortably, so ranks cluster in the middle and the histogram arches. A posterior that is <b>shifted</b> puts too many draws on one side, and the histogram slopes.</p>
+  <p>The same three shapes turn up in a <b>PIT histogram</b>, which reads the same way but checks a forecast rather than an inference procedure, by evaluating the predictive distribution function at the observed value. <a href="https://nfidd.github.io/nfidd/">Nowcasting and forecasting infectious disease dynamics</a> uses them throughout.</p>
   <p>Modern practice reads the empirical CDF of the ranks against uniform instead of binning them. The difference plot has no bin-width choice, and a band can be drawn on it.</p>
 
   <div class="legend">
@@ -413,7 +457,7 @@
   <p class="tagline">The ones that come up in the practical</p>
 
   <details><summary>What is the difference between a prior predictive check and just plotting my prior?</summary>
-  <p>Plotting the prior shows you what you believe about a parameter. A prior predictive check shows you what that belief implies about data, after the model has transformed it. The transformation is where the surprises are: Uniform(1, 20) on <i>R</i><sub>0</sub> is flat on the parameter and heavily concentrated on "the whole island is infected within a week" on the outcome.</p></details>
+  <p>Plotting the prior shows you what you believe about a parameter. A prior predictive check shows you what that belief implies about data, after the model has transformed it. The transformation is where the surprises are. Uniform(1, 20) on <i>R</i><sub>0</sub> holds an <i>R</i><sub>0</sub> of 19 as plausible as one of 3, and almost every value in that range implies the whole island infected within a week.</p></details>
 
   <details><summary>My posterior predictive check passes. Is the model right?</summary>
   <p>No. It means the fitted model reproduces the statistics you chose to look at, on the data it was fitted to. This page has two statistics that pass on a model that cannot possibly be right, one because it carries no information and one because two errors cancel. A statistic the model misses is worth far more than one it matches.</p></details>
@@ -431,7 +475,7 @@
   <p>No. It costs hundreds of fits, so it belongs to model development rather than to daily use: a new likelihood, a new parameterisation, a custom sampler, or a pipeline whose results you intend to rely on repeatedly. For an established model in well-tested software, predictive checks and the usual convergence diagnostics catch most of what goes wrong.</p></details>
 
   <details><summary>The check failed. Do I change the observation model or the dynamics?</summary>
-  <p>Ask whether the failure is about spread or about shape. If the replicates have the right shape but are too tight around it, the observation model is the cheap fix, and a negative binomial is the usual first move. If the replicates have the wrong shape, as on this page, no observation model will help, because it changes how the gap is scored rather than what the model can produce.</p></details>
+  <p>Ask whether the failure is about spread or about shape. If the replicates have the right shape but the spread around it is wrong, most clearly when the spread grows with the fitted value, the observation model is the thing to change, and a negative binomial is the usual first move. If the replicates have the wrong shape, as on this page, no observation model will help, because it changes how the gap is scored rather than what the model can produce.</p></details>
 
   <details><summary>Why does the prior predictive distribution not use the fitted reporting rate?</summary>
   <p>Because at that stage there is no fit. The prior predictive distribution uses the prior on every parameter, including <i>&rho;</i> ~ Uniform(0, 1), which is why its intervals are so much wider than the posterior predictive ones in the same figure.</p></details>
@@ -518,12 +562,15 @@ var S0=279, I0=2, RINIT=3, NPOP=284, NDAYS=59;
 var OBS=[0,1,0,10,6,32,47,37,29,11,13,8,2,2,2,0,2,1,2,2,5,2,3,2,3,5,7,8,5,7,4,12,7,5,3,4,1,0,5,2,2,0,6,1,1,2,0,0,0,0,2,0,0,0,0,0,0,0,1];
 var OBSTOT=0; (function(){ for(var i=0;i<OBS.length;i++) OBSTOT+=OBS[i]; })();
 
-/* Daily incidence S(i-1) - S(i) for days 1..NDAYS, classical RK4 with a step
-   short enough for the fastest epidemic the priors allow. */
-function sirInc(R0,D){
+/* One solve, classical RK4 with a step short enough for the fastest epidemic
+   the priors allow. Returns the susceptible trajectory at t = 0, 1, ..., NDAYS
+   and the daily incidence S(i-1) - S(i) for days 1..NDAYS. The point at t = 0
+   is what makes the incidence over day 1 computable. */
+function sirSolve(R0,D){
   var beta=R0/D, nu=1/D;
   var per=Math.max(4,Math.min(40,Math.ceil(4*beta))), h=1/per;
-  var S=S0, I=I0, inc=new Array(NDAYS);
+  var S=S0, I=I0, inc=new Array(NDAYS), St=new Array(NDAYS+1);
+  St[0]=S;
   for(var d=0; d<NDAYS; d++){
     var Sp=S;
     for(var s=0; s<per; s++){
@@ -538,8 +585,17 @@ function sirInc(R0,D){
       I+=h/6*(b1+2*b2+2*b3+b4);
     }
     inc[d]=Math.max(Sp-S,0);
+    St[d+1]=S;
   }
-  return inc;
+  return {S:St, inc:inc};
+}
+function sirInc(R0,D){ return sirSolve(R0,D).inc; }
+/* R_t = R_0 S(t) / N, derived outside the model from the trajectory it returns.
+   The same function serves prior draws and posterior draws. */
+function reproductionNumber(R0,D){
+  var S=sirSolve(R0,D).S, r=new Array(NDAYS+1);
+  for(var t=0;t<=NDAYS;t++) r[t]=R0*S[t]/NPOP;
+  return r;
 }
 /* Final size relation: S(inf) = S(0) exp(-(R0/N)(N - S(inf) - R(0))). */
 function finalSize(R0){
@@ -923,6 +979,115 @@ PRIORREPS=replicate(priorParams(400,31415),271828);
     pb[i].addEventListener("click",function(){ kIn.value=this.getAttribute("data-k"); draw(); });
   }
   draw();
+})();
+
+/* ============ FIGURE 2b : the latent reproduction number ============ */
+(function(){
+  var svg=document.getElementById("rtSvg");
+  var B={x0:58,x1:700,y0:56,y1:322};
+  var dayIn=document.getElementById("rtDay");
+  var scale="shared";
+
+  /* One column of R_t values per day, sorted, so a quantile is a lookup. */
+  function rtCols(params){
+    var cols=[];
+    for(var t=0;t<=NDAYS;t++) cols.push(new Array(params.length));
+    for(var i=0;i<params.length;i++){
+      var r=reproductionNumber(params[i][0],params[i][1]);
+      for(var t2=0;t2<=NDAYS;t2++) cols[t2][i]=r[t2];
+    }
+    for(var t3=0;t3<=NDAYS;t3++) cols[t3]=sortNum(cols[t3]);
+    return cols;
+  }
+  var priorCols=rtCols(priorParams(200,2718));
+  var postCols=rtCols(thin(FULLFIT,200));
+
+  var crossDay=null;
+  for(var t=0;t<=NDAYS;t++){ if(quant(postCols[t],0.5)<1){ crossDay=t; break; } }
+
+  function band(cols,sx,sy,plo,phi,col,op){
+    var d="";
+    for(var t=0;t<=NDAYS;t++) d+=(t?" L ":"M ")+sx(t)+" "+sy(quant(cols[t],phi));
+    for(var e=NDAYS;e>=0;e--) d+=" L "+sx(e)+" "+sy(quant(cols[e],plo));
+    pth(svg,d+" Z",{fill:col,"fill-opacity":op,stroke:"none"});
+  }
+  function medianPath(cols,sx,sy,col){
+    var d="";
+    for(var t=0;t<=NDAYS;t++) d+=(t?" L ":"M ")+sx(t)+" "+sy(quant(cols[t],0.5));
+    pth(svg,d,{stroke:col,"stroke-width":1.9,opacity:0.9});
+  }
+  function iv(cols,day){ return [quant(cols[day],0.05), quant(cols[day],0.95)]; }
+  function fmt(a){ return a[0].toFixed(2)+" to "+a[1].toFixed(2); }
+
+  function draw(){
+    var day=+dayIn.value;
+    put("rtDayVal",day);
+    clear(svg);
+    var ymax=0, src=(scale==="shared")?priorCols:postCols;
+    for(var t=0;t<=NDAYS;t++){ var v=quant(src[t],0.95); if(v>ymax) ymax=v; }
+    ymax=Math.max(ymax*1.12,1.25);
+    var sx=function(t){ return B.x0+t/NDAYS*(B.x1-B.x0); };
+    /* clamped, so a band that runs past the axis maximum stops at the top edge
+       rather than covering the subtitle above the panel */
+    var sy=function(v){ return B.y1-Math.min(v/ymax,1)*(B.y1-B.y0); };
+
+    txt(svg,B.x0,B.y0-26,"Effective reproduction number R_t = R_0 S(t) / N",
+      {"font-size":13,"font-weight":700,fill:"#1f2933"});
+    txt(svg,B.x0,B.y0-9,"grey: parameters from p(θ)   blue: parameters from p(θ | y)",
+      {"font-size":11,fill:"#9ca3af"});
+    txt(svg,B.x1,B.y0-9,"axis maximum "+ymax.toFixed(1),{"text-anchor":"end","font-size":10.5,fill:"#9ca3af"});
+
+    var ts=niceTicks(0,ymax,5);
+    for(var i=0;i<ts.length;i++){
+      ln(svg,B.x0,sy(ts[i]),B.x1,sy(ts[i]),{stroke:"#eef2f7"});
+      txt(svg,B.x0-8,sy(ts[i])+4,ts[i].toFixed(ymax<3?1:0),{"text-anchor":"end"});
+    }
+    ln(svg,B.x0,B.y1,B.x1,B.y1);
+
+    band(priorCols,sx,sy,0.05,0.95,"#64748b",0.18);
+    band(priorCols,sx,sy,0.25,0.75,"#64748b",0.28);
+    band(postCols,sx,sy,0.05,0.95,"#2563eb",0.20);
+    band(postCols,sx,sy,0.25,0.75,"#2563eb",0.32);
+    medianPath(priorCols,sx,sy,"#64748b");
+    medianPath(postCols,sx,sy,"#2563eb");
+
+    ln(svg,B.x0,sy(1),B.x1,sy(1),{stroke:"#dc2626","stroke-width":1.6,"stroke-dasharray":"5 3"});
+    txt(svg,B.x1,sy(1)-6,"R_t = 1",{"text-anchor":"end",fill:"#dc2626","font-weight":600,"font-size":10.5});
+
+    var pi=iv(priorCols,day), qi=iv(postCols,day), x=sx(day);
+    ln(svg,x,B.y0,x,B.y1,{stroke:"#1f2933","stroke-width":1,"stroke-dasharray":"3 3",opacity:0.5});
+    ln(svg,x-5,sy(pi[0]),x+5,sy(pi[0]),{stroke:"#64748b","stroke-width":2});
+    ln(svg,x-5,sy(pi[1]),x+5,sy(pi[1]),{stroke:"#64748b","stroke-width":2});
+    ln(svg,x-5,sy(qi[0]),x+5,sy(qi[0]),{stroke:"#2563eb","stroke-width":2.4});
+    ln(svg,x-5,sy(qi[1]),x+5,sy(qi[1]),{stroke:"#2563eb","stroke-width":2.4});
+    var right=(x>B.x1-120);
+    txt(svg,right?x-8:x+8,B.y0+12,"day "+day,
+      {"text-anchor":right?"end":"start",fill:"#1f2933","font-weight":600,"font-size":11});
+
+    for(var t2=10;t2<=NDAYS;t2+=10) txt(svg,sx(t2),B.y1+16,t2,{"text-anchor":"middle"});
+    txt(svg,sx(0),B.y1+16,"0",{"text-anchor":"middle"});
+    txt(svg,(B.x0+B.x1)/2,B.y1+34,"day of the outbreak",{"text-anchor":"middle","font-size":11.5,fill:"#374151"});
+
+    put("rtPriorI",fmt(pi));
+    put("rtPostI",fmt(qi));
+    var wp=pi[1]-pi[0], wq=qi[1]-qi[0];
+    put("rtRatio",(wq>0)?((wp/wq).toFixed(1)+"×"):"—");
+    put("rtCross",(crossDay===null)?"never":crossDay);
+    var bs=document.querySelectorAll("#rtScale button");
+    for(var b=0;b<bs.length;b++) bs[b].classList.toggle("active", bs[b].getAttribute("data-y")===scale);
+  }
+
+  dayIn.addEventListener("input",draw);
+  var sb=document.querySelectorAll("#rtScale button");
+  for(var i=0;i<sb.length;i++){
+    sb[i].addEventListener("click",function(){ scale=this.getAttribute("data-y"); draw(); });
+  }
+  draw();
+
+  /* day 0 numbers quoted in the prose below the figure */
+  var p0=iv(priorCols,0), q0=iv(postCols,0);
+  put("rtA",fmt(p0)); put("rtB",fmt(q0));
+  put("rtC",((p0[1]-p0[0])/(q0[1]-q0[0])).toFixed(1)+"×");
 })();
 
 /* ================= FIGURE 3 : predictive p-values ================= */

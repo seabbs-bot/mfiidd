@@ -458,7 +458,7 @@ Data: the Tristan da Cunha influenza outbreak, 13 August to 10 October 1971, 59 
 
 </div>
 
-<script>
+<script id="engine">
 /* =================================================================
    The model is the one in the practical: SEIT4L simulated by the
    Gillespie algorithm (src/seit4l_gillespie.jl), observed as
@@ -664,6 +664,85 @@ function diamond(svg,x,y,r,fill,stroke){
     fill:fill,stroke:stroke||"none","stroke-width":1.4});
 }
 var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"};
+
+/* ================= using the machine's other cores =================
+   The heavy figures are many independent filter runs, so they go to a pool
+   of web workers when the browser will make them. The workers are built from
+   this page's own script text, so there is still one copy of the model and
+   no build step. A page opened from a file:// URL usually cannot make a
+   worker from a blob, so everything falls back to running in this thread. */
+var POOL={n:0, ws:[], ready:false, tried:false, why:""};
+function poolInit(){
+  if(POOL.tried) return POOL.ready;
+  POOL.tried=true;
+  try{
+    var src="", ids=["engine","sampler"], i, e;
+    for(i=0;i<ids.length;i++){ e=document.getElementById(ids[i]); if(e) src+=e.textContent+"\n"; }
+    src+="onmessage=function(ev){var m=ev.data;postMessage({i:m.i,r:doJob(m.job)});};";
+    var url=URL.createObjectURL(new Blob([src],{type:"text/javascript"}));
+    var n=Math.max(1,Math.min(8,(navigator.hardwareConcurrency||2)-1));
+    for(i=0;i<n;i++) POOL.ws.push(new Worker(url));
+    POOL.n=n; POOL.ready=true;
+  }catch(err){ POOL.ready=false; POOL.why=String(err&&err.message||err); }
+  return POOL.ready;
+}
+/* one job, run here; the workers run the same function */
+function doJob(job){
+  /* the cost is timed inside the job, so it is the cost on one core whether
+     or not the jobs are sharing the machine */
+  var t0=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+  function ms(){ return ((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0; }
+  if(job.kind==="filter")
+    return {logL:filterOnce(job.th,job.J,job.seed,"always",1,false).logL, ms:ms()};
+  if(job.kind==="chain"){
+    var c=runChain(job.J,job.scale,job.which,job.seed,job.n,job.start);
+    return {trace:c.trace, nacc:c.nacc, maxPlateau:c.maxPlateau, J:c.J, ms:ms(),
+            accepts:c.accepts.map(function(a){ return {it:a.it, th:a.th, ll:a.ll, plateau:a.plateau}; })};
+  }
+  if(job.kind==="spread"){
+    var rng=mulberry32(job.seed), a=[], i;
+    for(i=0;i<job.reps;i++) a.push(filterOnce(job.th,job.J,1+Math.floor(rng()*2147483646),"always",1,false).logL);
+    var m=0,v=0;
+    for(i=0;i<a.length;i++) m+=a[i]; m/=a.length;
+    for(i=0;i<a.length;i++) v+=(a[i]-m)*(a[i]-m);
+    return {mean:m, sd:Math.sqrt(v/Math.max(1,a.length-1)), vals:a, ms:ms()};
+  }
+  return {};
+}
+/* run a list of jobs, in parallel where the browser allows it */
+function runJobs(jobs, onProgress, onDone){
+  var out=new Array(jobs.length), done=0, next=0;
+  if(!poolInit()){
+    (function chunk(){
+      var t0=Date.now();
+      while(next<jobs.length && Date.now()-t0<40){ out[next]=doJob(jobs[next]); next++; done++; }
+      if(onProgress) onProgress(done,jobs.length,out);
+      if(next<jobs.length) setTimeout(chunk,0); else onDone(out);
+    })();
+    return;
+  }
+  var busy=0;
+  POOL.ws.forEach(function(w){
+    w.onmessage=function(ev){
+      out[ev.data.i]=ev.data.r; done++; busy--;
+      if(onProgress) onProgress(done,jobs.length,out);
+      feed(w);
+      if(done===jobs.length) onDone(out);
+    };
+  });
+  function feed(w){
+    if(next>=jobs.length) return;
+    var i=next++; busy++;
+    w.postMessage({i:i, job:jobs[i]});
+  }
+  POOL.ws.forEach(feed);
+  if(jobs.length===0) onDone(out);
+}
+function poolLabel(){
+  poolInit();
+  return POOL.ready ? ("spread over "+POOL.n+" workers")
+                    : "in this thread, because this browser would not make workers";
+}
 </script>
 
 <script>
@@ -1191,7 +1270,8 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   }
   function shelve(){ if(out.length) prev={out:out, label:settings()}; out=[]; }
   function total(){ return COUNTS.length*(+repI.value); }
-  function setNote(){ note.textContent=total()+" filter runs in total, a few seconds of work."; }
+  function setNote(){ note.textContent=total()+" filter runs in total, "+poolLabel()+
+    ". Each count is timed inside its own worker, so the cost is the cost on one core."; }
   function stats(a){
     var m=0,i,s=0;
     for(i=0;i<a.length;i++) m+=a[i]; m/=a.length;
@@ -1201,25 +1281,18 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   function start(){
     if(busy) return;
     busy=true; btn.disabled=true; shelve();
-    var label=settings();
-    var reps=+repI.value, k=0, rep=0, lls=[], t0=performance.now(),
-        seed=(Date.now()%90000)+1000, done=0;
-    function tick(){
-      var n=COUNTS[k], batch=Math.max(1,Math.round(48/n)), i;
-      for(i=0;i<batch && rep<reps;i++,rep++,done++)
-        lls.push(filterOnce(theta(+r0I.value),n,seed+k*997+rep,"always",1,false).logL);
-      if(rep>=reps){
-        var st=stats(lls);
-        out.push({n:n, mean:st.mean, sd:st.sd, t:(performance.now()-t0)/reps, label:label});
-        k++; rep=0; lls=[]; t0=performance.now();
-        draw();
-      }
-      bar.style.width=(100*done/total()).toFixed(1)+"%";
-      if(k<COUNTS.length) setTimeout(tick,0);
-      else { busy=false; btn.disabled=false; }
-    }
-    setTimeout(tick,0);
+    var label=settings(), reps=+repI.value, seed=(Date.now()%90000)+1000, jobs=[];
+    COUNTS.forEach(function(n,k){
+      jobs.push({kind:"spread", th:theta(+r0I.value), J:n, seed:seed+k*997, reps:reps});
+    });
+    runJobs(jobs,function(d,t){ bar.style.width=(100*d/t).toFixed(0)+"%"; },function(res){
+      out=COUNTS.map(function(n,k){
+        return {n:n, mean:res[k].mean, sd:res[k].sd, t:res[k].ms/reps, label:label};
+      });
+      busy=false; btn.disabled=false; draw();
+    });
   }
+
   function draw(){
     clear(svg);
     var g=pane(svg,56,20,18,64), each=((g.x1-g.x0)-66)/2;
@@ -1321,12 +1394,15 @@ var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"
   var GRID=[], sweeps=[], v;
   for(v=3;v<=12.0001;v+=0.5) GRID.push(Math.round(v*10)/10);
   function sweep(){
-    var J=1<<(+jI.value), seed=(Date.now()%90000)+7, ys=[], i;
-    for(i=0;i<GRID.length;i++)
-      ys.push(filterOnce(theta(GRID[i]),J,seed+i*131,"always",1,false).logL);
-    sweeps.push(ys);
-    if(sweeps.length>6) sweeps.shift();
-    draw();
+    var J=1<<(+jI.value), seed=(Date.now()%90000)+7;
+    var jobs=GRID.map(function(R0,i){
+      return {kind:"filter", th:theta(R0), J:J, seed:seed+i*131};
+    });
+    runJobs(jobs,null,function(res){
+      sweeps.push(res.map(function(r){ return r.logL; }));
+      if(sweeps.length>6) sweeps.shift();
+      draw();
+    });
   }
   function draw(){
     var i,k;

@@ -299,7 +299,7 @@
   <h2>Where the plateaus come from</h2>
   <p class="tagline">A plateau is a state whose likelihood was over-estimated</p>
   <p class="prose">The same proposals, run twice: once at the particle count in the bar, and once at eight times as many.
-  Under each chain, every state it accepted is scored again from repeated fresh filter runs, so the stored value can be compared with what that state is really worth.</p>
+  Every state the noisier chain accepted is then scored again from eight fresh runs at 128 particles, so the value it stored can be compared with what that state is really worth.</p>
 
   <div class="stage">
     <button id="krun">Run both chains</button>
@@ -422,7 +422,7 @@ Data: the Tristan da Cunha influenza outbreak, 13 August to 10 October 1971, 59 
 
 </div>
 
-<script>
+<script id="engine">
 /* =================================================================
    The model is the one in the practical: SEIT4L simulated by the
    Gillespie algorithm (src/seit4l_gillespie.jl), observed as
@@ -629,7 +629,7 @@ function diamond(svg,x,y,r,fill,stroke){
 }
 var C={part:"#f59e0b", data:"#dc2626", w:"#0891b2", fc:"#4f46e5", grey:"#94a3b8"};
 </script>
-<script>/* ================= the sampler =================
+<script id="sampler">/* ================= the sampler =================
    Priors are those in sessions/pmcmc.qmd, scripts/pmmh_setup.jl and
    sessions/seitl.qmd. Change one and change the rest. */
 var PARS=[
@@ -730,6 +730,85 @@ function stats(a){
   for(i=0;i<a.length;i++) s+=(a[i]-m)*(a[i]-m);
   return {mean:m, sd:Math.sqrt(s/Math.max(1,a.length-1))};
 }
+
+/* ================= using the machine's other cores =================
+   The heavy figures are many independent filter runs, so they go to a pool
+   of web workers when the browser will make them. The workers are built from
+   this page's own script text, so there is still one copy of the model and
+   no build step. A page opened from a file:// URL usually cannot make a
+   worker from a blob, so everything falls back to running in this thread. */
+var POOL={n:0, ws:[], ready:false, tried:false, why:""};
+function poolInit(){
+  if(POOL.tried) return POOL.ready;
+  POOL.tried=true;
+  try{
+    var src="", ids=["engine","sampler"], i, e;
+    for(i=0;i<ids.length;i++){ e=document.getElementById(ids[i]); if(e) src+=e.textContent+"\n"; }
+    src+="onmessage=function(ev){var m=ev.data;postMessage({i:m.i,r:doJob(m.job)});};";
+    var url=URL.createObjectURL(new Blob([src],{type:"text/javascript"}));
+    var n=Math.max(1,Math.min(8,(navigator.hardwareConcurrency||2)-1));
+    for(i=0;i<n;i++) POOL.ws.push(new Worker(url));
+    POOL.n=n; POOL.ready=true;
+  }catch(err){ POOL.ready=false; POOL.why=String(err&&err.message||err); }
+  return POOL.ready;
+}
+/* one job, run here; the workers run the same function */
+function doJob(job){
+  /* the cost is timed inside the job, so it is the cost on one core whether
+     or not the jobs are sharing the machine */
+  var t0=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+  function ms(){ return ((typeof performance!=="undefined"&&performance.now)?performance.now():Date.now())-t0; }
+  if(job.kind==="filter")
+    return {logL:filterOnce(job.th,job.J,job.seed,"always",1,false).logL, ms:ms()};
+  if(job.kind==="chain"){
+    var c=runChain(job.J,job.scale,job.which,job.seed,job.n,job.start);
+    return {trace:c.trace, nacc:c.nacc, maxPlateau:c.maxPlateau, J:c.J, ms:ms(),
+            accepts:c.accepts.map(function(a){ return {it:a.it, th:a.th, ll:a.ll, plateau:a.plateau}; })};
+  }
+  if(job.kind==="spread"){
+    var rng=mulberry32(job.seed), a=[], i;
+    for(i=0;i<job.reps;i++) a.push(filterOnce(job.th,job.J,1+Math.floor(rng()*2147483646),"always",1,false).logL);
+    var m=0,v=0;
+    for(i=0;i<a.length;i++) m+=a[i]; m/=a.length;
+    for(i=0;i<a.length;i++) v+=(a[i]-m)*(a[i]-m);
+    return {mean:m, sd:Math.sqrt(v/Math.max(1,a.length-1)), vals:a, ms:ms()};
+  }
+  return {};
+}
+/* run a list of jobs, in parallel where the browser allows it */
+function runJobs(jobs, onProgress, onDone){
+  var out=new Array(jobs.length), done=0, next=0;
+  if(!poolInit()){
+    (function chunk(){
+      var t0=Date.now();
+      while(next<jobs.length && Date.now()-t0<40){ out[next]=doJob(jobs[next]); next++; done++; }
+      if(onProgress) onProgress(done,jobs.length,out);
+      if(next<jobs.length) setTimeout(chunk,0); else onDone(out);
+    })();
+    return;
+  }
+  var busy=0;
+  POOL.ws.forEach(function(w){
+    w.onmessage=function(ev){
+      out[ev.data.i]=ev.data.r; done++; busy--;
+      if(onProgress) onProgress(done,jobs.length,out);
+      feed(w);
+      if(done===jobs.length) onDone(out);
+    };
+  });
+  function feed(w){
+    if(next>=jobs.length) return;
+    var i=next++; busy++;
+    w.postMessage({i:i, job:jobs[i]});
+  }
+  POOL.ws.forEach(feed);
+  if(jobs.length===0) onDone(out);
+}
+function poolLabel(){
+  poolInit();
+  return POOL.ready ? ("spread over "+POOL.n+" workers")
+                    : "in this thread, because this browser would not make workers";
+}
 </script>
 <script>/* ================= the shared bar ================= */
 (function(){
@@ -759,18 +838,18 @@ function stats(a){
     document.getElementById("n1dval").textContent=(d>=0?"+":"")+d.toFixed(1);
     var th=copyTh(START), th2=copyTh(START); th2.R_0=START.R_0+d;
     A=[]; B=[];
-    var rng=mulberry32(4242), done=0;
     /* a well-resolved value to stand in for the exact likelihood ratio */
-    exact={lp:logPrior(th), lp2:logPrior(th2),
-           ll:meanEstimate(th,256,mulberry32(99),8),
-           ll2:meanEstimate(th2,256,mulberry32(1099),8)};
-    (function chunk(){
+    exact={lp:logPrior(th), lp2:logPrior(th2), ll:null, ll2:null};
+    var jobs=[{kind:"spread",th:th,J:256,seed:99,reps:8},
+              {kind:"spread",th:th2,J:256,seed:1099,reps:8},
+              {kind:"spread",th:th,J:J,seed:4242,reps:R},
+              {kind:"spread",th:th2,J:J,seed:5252,reps:R}];
+    runJobs(jobs,null,function(res){
       if(g!==gen) return;
-      var batch=Math.max(1,Math.round(320/J)), i;
-      for(i=0;i<batch && done<R; i++,done++){ A.push(estimate(th,J,rng)); B.push(estimate(th2,J,rng)); }
+      exact.ll=res[0].mean; exact.ll2=res[1].mean;
+      A=res[2].vals; B=res[3].vals;
       draw(th,th2);
-      if(done<R) setTimeout(chunk,0);
-    })();
+    });
   }
 
   function draw(th,th2){
@@ -951,40 +1030,31 @@ function stats(a){
   var s1=document.getElementById("k1"), s2=document.getElementById("k2"),
       btn=document.getElementById("krun"), bar=document.getElementById("kbar"),
       note=document.getElementById("knote");
-  var N=250, low=null, high=null, pts=[], busy=false;
+  var N=250, REF=128, low=null, high=null, pts=[], busy=false;
 
   function setNote(){
     note.textContent=N+" iterations at "+barJ()+" particles and at "+Math.min(256,barJ()*8)+
-      ", plus ten fresh runs at every accepted state.";
+      ", plus eight fresh runs at "+REF+" particles at every accepted state, "+poolLabel()+".";
   }
   function start(){
     if(busy) return;
-    busy=true; btn.disabled=true; pts=[];
-    var J1=barJ(), J2=Math.min(256,J1*8), seed=(Date.now()%90000)+11, phase=0, k=0;
-    low=newChain(J1,BAR.scale,BAR.which,seed,START);
-    high=newChain(J2,BAR.scale,BAR.which,seed,START);
-    var total=2*N+40;
-    (function chunk(){
-      var i, budget=Math.max(1,Math.round(700/(phase===0?J1:J2)));
-      if(phase===0){
-        for(i=0;i<budget && k<N;i++,k++) iterate(low);
-        if(k>=N){ closeChain(low); phase=1; k=0; }
-      } else if(phase===1){
-        for(i=0;i<budget && k<N;i++,k++) iterate(high);
-        if(k>=N){ closeChain(high); phase=2; k=0; }
-      } else {
-        /* score each accepted state properly, to see what was really there */
-        var rng=mulberry32(seed+7), a=low.accepts;
-        for(i=0;i<2 && k<a.length;i++,k++){
-          var ref=meanEstimate(a[k].th,Math.min(256,J1*8),rng,10);
-          pts.push({excess:a[k].ll-ref, plateau:a[k].plateau});
-        }
-        if(k>=a.length){ busy=false; btn.disabled=false; }
-      }
-      bar.style.width=(100*Math.min(1,(phase===0?k/total:(phase===1?(N+k)/total:(2*N+k)/total)))).toFixed(1)+"%";
+    busy=true; btn.disabled=true; pts=[]; low=null; high=null;
+    var J1=barJ(), J2=Math.min(256,J1*8), seed=(Date.now()%90000)+11;
+    var jobs=[{kind:"chain",J:J1,scale:BAR.scale,which:BAR.which,seed:seed,n:N,start:START},
+              {kind:"chain",J:J2,scale:BAR.scale,which:BAR.which,seed:seed,n:N,start:START}];
+    runJobs(jobs,function(d,t){ bar.style.width=(50*d/t).toFixed(0)+"%"; },function(res){
+      low=res[0]; high=res[1];
       draw();
-      if(busy) setTimeout(chunk,0);
-    })();
+      /* score every accepted state properly, to see what was really there */
+      var jobs2=low.accepts.map(function(a,i){
+        return {kind:"spread", th:a.th, J:REF, seed:seed+7+i*131, reps:8};
+      });
+      runJobs(jobs2,function(d,t){ bar.style.width=(50+50*d/t).toFixed(0)+"%"; },function(res2){
+        pts=res2.map(function(r,i){ return {excess:low.accepts[i].ll-r.mean,
+                                            plateau:low.accepts[i].plateau}; });
+        busy=false; btn.disabled=false; draw();
+      });
+    });
   }
 
   function draw(){
@@ -1028,8 +1098,8 @@ function stats(a){
       for(i=0;i<n2;i++){ var dx=pts[i].excess-sx, dy=pts[i].plateau-sy;
         sxy+=dx*dy; sxx+=dx*dx; syy+=dy*dy; }
     }
-    document.getElementById("kacc1").textContent=low.it?(100*low.nacc/low.it).toFixed(0)+"%":"–";
-    document.getElementById("kacc2").textContent=high.it?(100*high.nacc/high.it).toFixed(0)+"%":"–";
+    document.getElementById("kacc1").textContent=(100*low.nacc/N).toFixed(0)+"%";
+    document.getElementById("kacc2").textContent=(100*high.nacc/N).toFixed(0)+"%";
     document.getElementById("kmax1").textContent=low.maxPlateau;
     document.getElementById("kmax2").textContent=high.maxPlateau;
     document.getElementById("kcor").textContent=
@@ -1047,27 +1117,29 @@ function stats(a){
       note=document.getElementById("tnote");
   var COUNTS=[8,16,32,64,128], out=[], busy=false;
   function setNote(){ note.textContent=COUNTS.length+" chains of "+(+nI.value)+
-    " iterations, one at each count, sharing a starting point."; }
+    " iterations, one at each count, sharing a starting point, "+poolLabel()+
+    ". Each chain's cost is timed inside its own worker, so it is the cost on one core."; }
   function start(){
     if(busy) return;
     busy=true; btn.disabled=true; out=[];
-    var n=+nI.value, k=0, seed=(Date.now()%90000)+3;
-    (function chunk(){
-      var J=COUNTS[k], t0=performance.now();
-      var c=runChain(J,BAR.scale,BAR.which,seed,n,START);
-      var el=(performance.now()-t0)/n, i, jump=0;
-      for(i=1;i<c.trace.length;i++) jump+=Math.pow(c.trace[i]-c.trace[i-1],2);
-      jump/=n;
-      var lls=[], rng=mulberry32(seed+91);
-      for(i=0;i<10;i++) lls.push(estimate(START,J,rng));
-      out.push({J:J, acc:c.nacc/n, jump:jump, ms:el, sd:stats(lls).sd,
-                maxPlateau:c.maxPlateau, perSec:jump/(el/1000)});
-      k++; bar.style.width=(100*k/COUNTS.length).toFixed(0)+"%";
-      draw();
-      if(k<COUNTS.length) setTimeout(chunk,0);
-      else { busy=false; btn.disabled=false; }
-    })();
+    var n=+nI.value, seed=(Date.now()%90000)+3, jobs=[];
+    COUNTS.forEach(function(J){
+      jobs.push({kind:"chain",J:J,scale:BAR.scale,which:BAR.which,seed:seed,n:n,start:START}); });
+    COUNTS.forEach(function(J){
+      jobs.push({kind:"spread",th:START,J:J,seed:seed+91,reps:10}); });
+    runJobs(jobs,function(d,t){ bar.style.width=(100*d/t).toFixed(0)+"%"; },function(res){
+      out=COUNTS.map(function(J,i){
+        var c=res[i], sp=res[COUNTS.length+i], jump=0, k2;
+        for(k2=1;k2<c.trace.length;k2++) jump+=Math.pow(c.trace[k2]-c.trace[k2-1],2);
+        jump/=n;
+        var perIter=c.ms/n;
+        return {J:J, acc:c.nacc/n, jump:jump, ms:perIter, sd:sp.sd,
+                maxPlateau:c.maxPlateau, perSec:jump/(perIter/1000)};
+      });
+      busy=false; btn.disabled=false; draw();
+    });
   }
+
   function draw(){
     clear(svg);
     var g=pane(svg,58,26,18,64), each=((g.x1-g.x0)-70)/2, i;
@@ -1140,22 +1212,21 @@ function stats(a){
       bClr=document.getElementById("xclear"), bar=document.getElementById("xbar"),
       note=document.getElementById("xnote");
   var FEW=8, MANY=64, ITER=250, few=[], many=[], busy=false, seed=5;
-  note.textContent="Chains of "+ITER+" iterations at "+FEW+" particles and at "+MANY+".";
+  note.textContent="Chains of "+ITER+" iterations at "+FEW+" particles and at "+MANY+", "+poolLabel()+".";
   function start(){
     if(busy) return;
     busy=true; btn.disabled=true;
-    var k=0, jobs=[];
-    for(var i=0;i<4;i++){ jobs.push(FEW); jobs.push(MANY); }
-    (function chunk(){
-      var J=jobs[k];
-      var c=runChain(J,BAR.scale,BAR.which,seed++,ITER,START);
-      (J===FEW?few:many).push(c.trace.slice(1));
-      k++; bar.style.width=(100*k/jobs.length).toFixed(0)+"%";
-      draw();
-      if(k<jobs.length) setTimeout(chunk,0);
-      else { busy=false; btn.disabled=false; }
-    })();
+    var jobs=[], i;
+    for(i=0;i<4;i++){
+      jobs.push({kind:"chain",J:FEW,scale:BAR.scale,which:BAR.which,seed:seed++,n:ITER,start:START});
+      jobs.push({kind:"chain",J:MANY,scale:BAR.scale,which:BAR.which,seed:seed++,n:ITER,start:START});
+    }
+    runJobs(jobs,function(d,t){ bar.style.width=(100*d/t).toFixed(0)+"%"; },function(res){
+      res.forEach(function(c){ (c.J===FEW?few:many).push(c.trace.slice(1)); });
+      busy=false; btn.disabled=false; draw();
+    });
   }
+
   function pool(a){ var o=[],i,j; for(i=0;i<a.length;i++) for(j=0;j<a[i].length;j++) o.push(a[i][j]); return o; }
   function draw(){
     clear(svg);
