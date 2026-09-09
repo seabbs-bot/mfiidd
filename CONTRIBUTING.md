@@ -102,7 +102,7 @@ D_imm ~ truncated(Normal(15.0, 10.0), lower=1.0)
 ρ ~ Beta(2, 2)
 ```
 
-There are five copies: `seitl_model` in `sessions/seitl.qmd`, `pmmh_seit4l` and `seit4l_deterministic_model` in `sessions/pmcmc.qmd`, `scripts/pmmh_setup.jl`, and `PRIORS` in `sessions/neural_posterior_estimation.qmd`, which needs a vector of distributions to draw from and to invert rather than `~` statements.
+There are six copies: `seitl_model` in `sessions/seitl.qmd`, `pmmh_seit4l` and `seit4l_deterministic_model` in `sessions/pmcmc.qmd`, `scripts/pmmh_setup.jl`, `PRIORS` in `sessions/neural_posterior_estimation.qmd`, which needs a vector of distributions to draw from and to invert rather than `~` statements, and `PARS` in `interactive/pmcmc.html`, a JavaScript port that runs the sampler in the browser.
 Change one and change the rest.
 The committed chains in `data/` were generated under these priors, so a change to them means re-running `scripts/generate_pmcmc_seitl.jl` and `scripts/generate_pmcmc_seit4l.jl` and committing the new output.
 
