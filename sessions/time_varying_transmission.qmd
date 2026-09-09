@@ -1,0 +1,611 @@
+---
+title: "Time-varying transmission with a particle filter"
+subtitle: "Where a latent trajectory can live, and whether it should live anywhere"
+format: html
+engine: julia
+order: 10
+---
+
+::: {.callout-note appearance="simple"}
+**Estimated time**: 45-60 minutes | **Optional session** | **Requires**: [Particle filters](particle_filters.qmd) and [Particle MCMC](pmcmc.qmd)
+:::
+
+# Introduction
+
+The [particle MCMC session](pmcmc.qmd) fitted SEIT4L to the Tristan da Cunha outbreak with one transmission rate for the whole 59 days.
+That is a strong assumption.
+Contact patterns change, people react to an epidemic they can see, and a rate that is free to move is the obvious next thing to want.
+
+Letting it move is easy to write down.
+Let $\log \beta$ follow a Gaussian random walk over the observation days:
+
+$$\log \beta_t = \log \beta_{t-1} + \sigma \varepsilon_t, \qquad \varepsilon_t \sim \mathrm{Normal}(0, 1)$$
+
+Start the walk at $\log(R_0 / D_\mathrm{inf})$ and $\sigma = 0$ gives back exactly the model the particle MCMC session fitted, so $\sigma$ measures how much the data want the rate to move.
+
+Two questions follow, and this session takes them in order.
+The first is where the 59 new unknowns go.
+They can sit in the latent state, where the particle filter integrates them out along with the epidemic, or in the outer sampler alongside the six SEIT4L parameters, which is where a model of this shape would normally put them.
+Only one of those turns out to be available, and the reason is worth seeing.
+
+The second question is the one that matters more.
+Having made the rate free to move, can these data tell us whether it did?
+
+::: {.callout-note collapse="true"}
+## How this differs from the universal differential equations session
+
+The [universal differential equations session](universal_differential_equations.qmd) also learns a time-varying $\beta$ for this outbreak, so it is worth being clear about what is different here.
+
+That session puts a neural network inside a deterministic SIR model and trains it by gradient descent, giving a point estimate with no uncertainty attached.
+Here the model is stochastic, the fit is Bayesian, and $\beta(t)$ is a random walk with a prior and a posterior.
+The structure underneath is SEIT4L, which unlike SIR can produce a second wave on its own.
+
+Those changes matter, and the last of them turns out to matter most.
+:::
+
+# Objectives
+
+In this session you will:
+
+1. Carry a time-varying transmission rate as a component of a particle filter's latent state
+2. See concretely why a gradient-based sampler cannot be pointed at a particle filter's likelihood
+3. Measure what the remaining alternative costs, in effective sample size per second
+4. Find the ridge that a random walk on $\beta$ opens up, and see why a one-dimensional profile does not reveal it
+
+# Setup
+
+```{julia}
+#| echo: false
+#| include: false
+
+ENV["GKSwstype"] = "100"  ## suppress plot windows during render
+```
+
+## Source file
+
+The source file of this session is located at `sessions/time_varying_transmission.qmd`.
+
+## Load libraries
+
+```{julia}
+using Random ## for random numbers
+using Statistics ## for means and standard deviations
+using Distributions ## for probability distributions
+using DataFrames ## for data frames
+using Plots ## for plots
+using StatsPlots ## for statistical plots
+using Turing ## for probabilistic programming and MCMC
+using MCMCChains ## to rebuild a chain object from the saved CSVs
+using AdvancedMH ## for the RAM proposal
+using CSV ## for CSV file reading
+using ForwardDiff ## for automatic differentiation
+using SSMProblems ## for the state-space model interface
+using GeneralisedFilters ## for particle filtering
+using DrWatson ## for datadir
+using MFIIDD ## the course package
+```
+
+## Load the data
+
+```{julia}
+Random.seed!(1234)
+flu_tdc = CSV.read(datadir("flu_tdc_1971.csv"), DataFrame)
+init_state = [279.0, 0.0, 2.0, 3.0, 0.0, 0.0, 0.0, 0.0]
+n_obs = length(flu_tdc.obs)
+
+## the constant-rate fit this session is measured against
+chain_const = CSV.read(datadir("pmcmc_seit4l_chain.csv"), DataFrame)
+
+println("$(n_obs) days, $(sum(flu_tdc.obs)) reported cases, $(Threads.nthreads()) thread(s)")
+```
+
+# Two places to put the walk
+
+The generative model is the same either way.
+Each day $\log \beta$ takes a Normal increment of scale $\sigma$, and the epidemic is simulated for that day at the resulting rate.
+What differs is who owns the 59 increments.
+
+**In the state.**
+The latent state grows by one component, from `[S, E, I, T1, T2, T3, T4, L, daily_inc]` to `[S, E, I, T1, T2, T3, T4, L, log β, daily_inc]`.
+Each particle draws its own increment and simulates its day at its own rate.
+The filter is already integrating over latent paths, so integrating over one more component is what it does anyway.
+The outer sampler then sees seven parameters: the six from the particle MCMC session, plus $\sigma$.
+
+**In the outer sampler.**
+The 59 increments are parameters like any other.
+A filter run takes a whole transmission trajectory as given and returns the likelihood conditional on it, integrating over the epidemic alone.
+The outer sampler sees 66 parameters.
+
+Both are in the course package and they share a stepper.
+The only thing `seit4l_step_beta!` changes about the Gillespie step from the [particle filters session](particle_filters.qmd) is that the transmission rate arrives as an argument instead of being computed from $R_0$ and $D_\mathrm{inf}$ once per call.
+Given that, the first arrangement is three lines of arithmetic on top of the constant-rate dynamics: copy the compartments across, take the increment, and step the day at the rate it gives.
+
+```julia
+state[9] = prev_state[9] + σ * randn(rng)                               ## the walk
+state[10] = seit4l_step_beta!(rng, state, exp(state[9]), ϵ, ν, τ, α, 1.0) ## the day
+```
+
+::: {.callout-note collapse="true"}
+## The rest of the implementation
+
+The two dynamics types, the stepper they share, and the runners that wrap them are in [`src/seit4l_tvbeta.jl`](https://github.com/mfiidd/mfiidd/blob/main/src/seit4l_tvbeta.jl):
+
+```{julia}
+#| echo: false
+#| output: asis
+println("```julia\n", source_for("seit4l_tvbeta.jl"), "\n```")
+```
+:::
+
+Carrying the extra state component is nearly free:
+
+```{julia}
+θ_rw = Dict(:D_lat => 1.3, :D_inf => 2.0, :α => 0.5, :D_imm => 10.5,
+            :ρ => 0.7, :σ => 0.1, :logβ0 => log(6.0 / 2.0))
+θ_const = Dict(:R_0 => 6.0, :D_lat => 1.3, :D_inf => 2.0, :α => 0.5,
+               :D_imm => 10.5, :ρ => 0.7)
+
+t_rw = minimum(@elapsed(run_filter_rw(θ_rw, flu_tdc.obs, 128)) for _ in 1:10)
+t_const = minimum(
+    @elapsed(run_particle_filter(θ_const, flu_tdc.obs, 128; threaded = true)) for _ in 1:10
+)
+println("one filter run at 128 particles")
+println("  constant rate:     $(round(t_const, digits = 4)) s")
+println("  random-walk state: $(round(t_rw, digits = 4)) s")
+```
+
+The extra work is one Normal draw per particle per day, against the tens of Gillespie events that day already costs.
+That is the whole argument for putting the walk in the state, and it is worth noticing how little there is to it.
+
+# The walk in the state
+
+The Turing model is the particle MCMC session's, with one prior added and one line changed.
+The six SEIT4L priors are unchanged, which matters: $R_0$ keeps its meaning as the reproduction number the walk starts from, so the two fits are comparable.
+
+```{julia}
+@model function pmmh_tvbeta_state(obs, n_particles)
+    R_0 ~ truncated(Normal(3.0, 2.0), lower=1.0)
+    D_lat ~ truncated(Normal(2.0, 1.0), lower=0.5)
+    D_inf ~ truncated(Normal(3.0, 2.0), lower=0.5)
+    α ~ Beta(2, 2)
+    D_imm ~ truncated(Normal(15.0, 10.0), lower=1.0)
+    ρ ~ Beta(2, 2)
+    σ ~ truncated(Normal(0.0, 0.2), lower=0.0)
+
+    v = ForwardDiff.value
+    θ = Dict(:D_lat => v(D_lat), :D_inf => v(D_inf), :α => v(α),
+             :D_imm => v(D_imm), :ρ => v(ρ), :σ => v(σ),
+             :logβ0 => log(v(R_0) / v(D_inf)))
+
+    Turing.@addlogprob! run_filter_rw(θ, obs, n_particles)
+end
+```
+
+::: {.callout-tip collapse="true"}
+## Code explainer
+- **`σ ~ truncated(Normal(0.0, 0.2), lower=0.0)`** — a half-Normal on the daily increment scale. Over 59 days a $\sigma$ of 0.2 lets $\log \beta$ wander by about $0.2\sqrt{59} \approx 1.5$, a factor of four either way, so this prior is generous rather than cautious. The lower bound at zero puts the constant-rate model at the edge of the parameter space rather than outside it.
+- **`:logβ0 => log(v(R_0) / v(D_inf))`** — the walk starts where the constant-rate model sits. This is what keeps the six priors doing the same job they do in the [particle MCMC session](pmcmc.qmd).
+- **`ForwardDiff.value`** — strips the Duals that Turing's initialisation probe pushes through the model, exactly as in the particle MCMC session. Hold on to this line; the next section is about what it costs you.
+:::
+
+A short chain, to see that it runs:
+
+```{julia}
+model_state = pmmh_tvbeta_state(flu_tdc.obs, 128)
+Random.seed!(1)
+chain_short = sample(
+    model_state,
+    externalsampler(AdvancedMH.RobustAdaptiveMetropolis()),
+    500;
+    num_warmup=500,
+    check_model=false,
+    progress=false
+)
+plot(chain_short)
+```
+
+It mixes about as badly as the short chain in the particle MCMC session, and for the same reasons: 500 warmup iterations are nowhere near enough for RAM to find a proposal, and the likelihood is noisy.
+Longer chains are loaded below.
+
+# The walk in the outer sampler
+
+This is the arrangement a statistician would reach for first.
+The increments are parameters, the model is a non-centred random walk, and a gradient-based sampler handles 59 correlated Gaussian increments comfortably.
+That is what NUTS is for.
+
+It is not available here, and it is worth seeing exactly how it fails.
+
+## The gradient does not exist
+
+Take the log-likelihood as a function of the 59 values of $\log \beta$, holding everything else fixed, and ask ForwardDiff for its gradient:
+
+```{julia}
+θ_path = Dict(:D_lat => 1.3, :D_inf => 2.0, :α => 0.5, :D_imm => 10.5, :ρ => 0.7)
+f(logβ) = run_filter_path(θ_path, logβ, flu_tdc.obs, 128)
+
+logβ_flat = fill(log(3.0), n_obs)
+Random.seed!(1)
+g = ForwardDiff.gradient(f, logβ_flat)
+println("log-likelihood: ", round(f(logβ_flat), digits = 2))
+println("largest absolute gradient component: ", maximum(abs, g))
+```
+
+The gradient is exactly zero in every one of 59 directions.
+That is the `ForwardDiff.value` call doing its job: it strips the dual part before the numbers reach the filter, so what comes back is the derivative of a constant.
+
+This is the dangerous failure, because nothing complains.
+Put the model in front of NUTS and it runs.
+Every Hamiltonian trajectory it builds for the 59 increments is driven by the prior alone, because that is all its gradient contains, so the sampler proposes as though the data did not exist and then accepts or rejects on a likelihood estimate that is noisy in a way the leapfrog integrator assumes it is not.
+Nothing in the output says so.
+
+::: {.callout-warning}
+## A zero gradient is not a flat posterior
+
+`ForwardDiff.value` appears in every model in this course that calls a particle filter, and in the [particle MCMC session](pmcmc.qmd) it is harmless: the sampler there is Metropolis-Hastings, which never asks for a gradient, and the call only exists to survive Turing's initialisation probe.
+
+Combine the same line with a gradient-based sampler and it silently deletes the likelihood from the gradient.
+If you attach a particle filter to NUTS, check that the gradient is non-zero before you believe anything the sampler tells you.
+:::
+
+Take the strip away and the failure at least becomes loud:
+
+```{julia}
+function f_no_strip(logβ)
+    ssm = StateSpaceModel(
+        SEIT4LInitial(init_state),
+        SEIT4LPathDynamics(Dict{Symbol, Float64}(θ_path), logβ),
+        PoissonObservation(θ_path[:ρ])
+    )
+    _, ll = GeneralisedFilters.filter(Random.default_rng(), ssm, BF(128), flu_tdc.obs)
+    return ll
+end
+
+try
+    ForwardDiff.gradient(f_no_strip, logβ_flat)
+catch e
+    println(first(split(sprint(showerror, e), "\n"), 2))
+end
+```
+
+`SEIT4LPathDynamics` declares `Vector{Float64}`, so the Duals have nowhere to go.
+Relaxing that type would not help.
+The Gillespie stepper chooses each event by comparing a uniform draw against a cumulative sum of rates, and counts the `E → I` transitions as an integer.
+A derivative cannot get past a comparison and a count.
+
+## What the surface actually looks like
+
+The obstacle is not a missing implementation.
+Fix the random seed, so that the filter is a deterministic function of its arguments, and walk one day's $\log \beta$ across a small interval:
+
+```{julia}
+#| output: false
+grid = range(log(3.0), log(3.0) + 0.05, length = 200)
+scan = map(grid) do x
+    lβ = copy(logβ_flat)
+    lβ[30] = x
+    Random.seed!(3)
+    run_filter_path(θ_path, lβ, flu_tdc.obs, 32; threaded = false)
+end
+```
+
+```{julia}
+plot(grid, scan, seriestype = :steppost, linewidth = 2, legend = false,
+     xlabel = "log β on day 30", ylabel = "log-likelihood",
+     title = "One seed, one coordinate, 200 points")
+```
+
+```{julia}
+println("distinct values across the 200 points: ", length(unique(round.(scan, digits = 9))))
+println("range: ", round(minimum(scan), digits = 1), " to ", round(maximum(scan), digits = 1))
+```
+
+The surface is a step function.
+Changing $\log \beta$ changes the *times* of the simulated events continuously, but the likelihood only sees the daily counts of them, which are integers.
+Nothing happens until a perturbation is large enough to reorder two events or move one across a day boundary, and then everything downstream happens at once.
+Between the steps the derivative is zero; at the steps it does not exist.
+There is no gradient to find, at any seed, with any autodiff backend.
+
+::: {.callout-tip title="Exercise: predict the effect of more particles"}
+The scan above uses 32 particles.
+Before running it, predict what the plot looks like at 512.
+
+1. Does the step function become smooth?
+2. Does averaging over many seeds at each point help?
+3. Would either give NUTS something to work with?
+:::
+
+::: {.callout-tip title="Solution" collapse="true"}
+**More particles does not smooth it.** Every particle is stepped by the same discrete algorithm, so each contributes its own step function and their average is a step function with more, smaller steps. It approaches the true likelihood, which *is* smooth in $\log \beta$ because it integrates over the randomness rather than fixing a seed, but it approaches it as a staircase, and no finite particle count arrives.
+
+**Averaging over seeds does not either**, for the same reason: an average of step functions is a step function.
+
+**Neither gives NUTS anything.** What NUTS needs is the gradient of the function it is actually evaluating, and that function is the staircase. This is why the answer is not "use a better autodiff backend". The discreteness is in the model. The ways past it are to change the simulator so its output is a smooth function of $\beta$, which a diffusion approximation would do, or to stop asking for a gradient.
+:::
+
+## The only route left, and what it costs
+
+Without a gradient, the 59 increments have to be moved by a random walk in the same RAM block as the six parameters.
+That is 66 dimensions with no gradient information, which is the regime a gradient-based sampler exists to rescue you from.
+We fitted it anyway, because a measurement makes the point better than an expectation.
+Both chains come from `scripts/generate_tvbeta_chains.jl`:
+
+```{julia}
+state_df = CSV.read(datadir("pmmh_tvbeta_state.csv"), DataFrame)
+outer_df = CSV.read(datadir("pmmh_tvbeta_outer.csv"), DataFrame)
+pars = [:R_0, :D_lat, :D_inf, :α, :D_imm, :ρ, :σ]
+
+function report(df, name)
+    e = ess(Chains(Matrix(df[:, pars]), pars))[:, :ess]
+    secs = first(df.wall_seconds)
+    println(rpad(name, 22), " draws=", rpad(nrow(df), 7),
+            " wall=", rpad(string(round(secs / 60, digits = 1), " min"), 11),
+            " min ESS=", rpad(round(minimum(e), digits = 1), 8),
+            " min ESS/s=", round(minimum(e) / secs, digits = 4))
+end
+
+report(state_df, "walk in the state")
+report(outer_df, "walk in the sampler")
+```
+
+::: {.callout-warning}
+## Do not read the second chain's posterior
+
+The numbers above are a cost measurement.
+The 66-dimensional chain has not converged and is not a fit of anything.
+It is here so that the size of the gap is a number rather than an assertion.
+:::
+
+The trace of $\sigma$ shows what those effective sample sizes are summarising:
+
+```{julia}
+#| code-fold: true
+#| code-summary: "Plotting code"
+p1 = plot(state_df.σ[state_df.chain .== 1], title = "walk in the state",
+          legend = false, xlabel = "draw", ylabel = "σ", colour = :steelblue)
+p2 = plot(outer_df.σ, title = "walk in the outer sampler",
+          legend = false, xlabel = "draw", ylabel = "σ", colour = :darkorange)
+plot(p1, p2, layout = (1, 2), size = (900, 320))
+```
+
+::: {.callout-important}
+## Where a latent trajectory belongs
+
+A latent quantity with one value per observation has to go in the state when the likelihood comes from a particle filter.
+
+The usual reason to prefer parameters over states is that a gradient-based sampler handles hundreds of correlated parameters and a random-walk sampler does not.
+A particle filter takes the gradient away, so that reason evaporates, and what is left is a high-dimensional random walk against a filter that integrates the same quantity out for a few per cent more per run.
+
+This is not a limitation of the filter.
+It is the filter's purpose: the reason to run one is that it does the high-dimensional integral you would otherwise have to sample.
+:::
+
+# Can these data see σ?
+
+The rest of the session is about the second question, and the answer changes what the first one was worth.
+
+Start with what the fit says.
+Compare the seven-parameter posterior against the constant-rate posterior from the particle MCMC session, and against the prior on $\sigma$:
+
+```{julia}
+prior_σ = truncated(Normal(0.0, 0.2), lower = 0.0)
+println(rpad("", 8), rpad("constant", 12), rpad("random walk", 12))
+for p in [:R_0, :D_lat, :D_inf, :α, :D_imm, :ρ]
+    println(rpad(p, 8), rpad(round(mean(chain_const[!, p]), digits = 3), 12),
+            round(mean(state_df[!, p]), digits = 3))
+end
+println()
+println("σ prior:     mean ", round(mean(prior_σ), digits = 3),
+        "  95% ", round.(quantile.(prior_σ, [0.025, 0.975]), digits = 3))
+println("σ posterior: mean ", round(mean(state_df.σ), digits = 3),
+        "  95% ", round.(quantile(state_df.σ, [0.025, 0.975]), digits = 3))
+```
+
+Two things in that output are worth stopping on.
+
+The posterior for $\sigma$ is barely distinguishable from its prior.
+It has shifted a little and lost its lower tail, and that is all.
+The data have almost nothing to say about how much transmission varied.
+
+And the other parameters have moved.
+$R_0$ and $D_\mathrm{inf}$ in particular are some way from where the constant-rate fit puts them, and the infectious period is a quantity with a meaning outside the model.
+A parameter the data cannot pin down has dragged parameters they can.
+
+## Why: the ridge
+
+Because the walk is on $\log \beta$, it is multiplicative, and the mean transmission rate it implies grows with time:
+
+$$\mathbb{E}[\beta_t] = \beta_0 \exp(\sigma^2 t / 2)$$
+
+So $\sigma$ and $\beta_0$ pull in opposite directions.
+Raise $\sigma$ and lower $\beta_0$ and the epidemic over 59 days can look much the same.
+Watch it happen on the actual likelihood surface:
+
+```{julia}
+#| output: false
+base = Dict(:D_lat => mean(chain_const.D_lat), :D_inf => mean(chain_const.D_inf),
+            :α => mean(chain_const.α), :D_imm => mean(chain_const.D_imm),
+            :ρ => mean(chain_const.ρ))
+β_const = mean(chain_const.R_0) / mean(chain_const.D_inf)
+
+σ_grid = [0.0, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40]
+β_grid = round.(β_const .* [0.35, 0.5, 0.7, 0.85, 1.0, 1.2], digits = 3)
+
+## `nchunks` is fixed rather than taken from the thread count, so that this
+## surface is the same on every machine; see the warning in the particle MCMC
+## session about what threads do to a seed
+surface_ll = [
+    begin
+        Random.seed!(21)
+        mean(run_filter_rw(merge(base, Dict(:σ => σ, :logβ0 => log(β0))),
+                           flu_tdc.obs, 512; nchunks = 4) for _ in 1:10)
+    end
+    for β0 in β_grid, σ in σ_grid
+]
+```
+
+```{julia}
+#| code-fold: true
+#| code-summary: "Plotting code"
+best = maximum(surface_ll)
+contourf(σ_grid, β_grid, clamp.(surface_ll .- best, -25, 0),
+         levels = 12, colour = :viridis,
+         xlabel = "σ", ylabel = "β on day zero",
+         title = "log-likelihood, relative to its maximum")
+scatter!([0.0], [β_const], label = "constant-rate fit",
+         colour = :white, markersize = 6)
+scatter!([mean(state_df.σ)], [mean(state_df.R_0) / mean(state_df.D_inf)],
+         label = "random-walk fit", colour = :red, markersize = 6)
+```
+
+```{julia}
+for (i, β0) in enumerate(β_grid)
+    row = surface_ll[i, :]
+    println("β₀=", rpad(β0, 7), " best σ=", rpad(σ_grid[argmax(row)], 6),
+            " ll there=", rpad(round(maximum(row), digits = 1), 9),
+            " ll at σ=0: ", round(row[1], digits = 1))
+end
+```
+
+The best $\sigma$ falls as $\beta_0$ rises, and the likelihood along that diagonal changes far less than it does across it.
+That is a ridge, and the two fitted points sit at opposite ends of it.
+
+The mechanism is entirely mundane once you see it.
+A larger $\sigma$ inflates transmission on average, so it can pay for a smaller $\beta_0$ — which is to say, for a smaller $R_0$, which the prior would rather have.
+The prior on $R_0$ is $\mathrm{Normal}(3, 2)$ truncated below at 1, and the constant-rate fit puts $R_0$ well above 3, so the prior is pulling against the likelihood the whole time.
+Adding $\sigma$ gives the model a way to satisfy the prior at almost no cost in fit:
+
+```{julia}
+for (name, r0, dinf, σ) in
+    (("constant", mean(chain_const.R_0), mean(chain_const.D_inf), 0.0),
+     ("random walk", mean(state_df.R_0), mean(state_df.D_inf), mean(state_df.σ)))
+    β0 = r0 / dinf
+    println(rpad(name, 12), " R_0=", rpad(round(r0, digits = 2), 6),
+            " β₀=", rpad(round(β0, digits = 2), 6),
+            " implied E[β] on day 59 = ", round(β0 * exp(σ^2 * 59 / 2), digits = 2))
+end
+```
+
+By the end of the outbreak the fitted random walk implies a mean transmission rate far above its day-zero value.
+That is not a description of anything anyone observed on Tristan da Cunha.
+It is the shape the model takes when a flexible component is free and nothing pins it down.
+
+::: {.callout-warning}
+## A one-dimensional profile cannot find a ridge
+
+Fix the other parameters and profile the likelihood over $\sigma$ alone, and you get a curve with a clear peak, which reads as identification.
+Do it at a different point on the ridge and you get another clear peak, somewhere else.
+
+Both curves are slices across a surface that is nearly flat along its length.
+Neither of them shows you that.
+If you check identifiability by varying one parameter at a time, a ridge is exactly what you will miss, and a ridge is the failure mode a flexible time-varying component creates.
+:::
+
+## Would we see σ if it were there?
+
+A flat answer on real data has two explanations that call for different responses.
+Either these data contain no time-varying transmission, or $\sigma$ could not be recovered from 59 days of a 284-person outbreak whatever the truth.
+Simulated data separate them.
+Here the other parameters are held at the values the data were generated from, which is the most generous case there is:
+
+```{julia}
+#| output: false
+sim_base = merge(base, Dict(:logβ0 => log(β_const)))
+
+function σ_profile(obs; n_rep = 6, n_particles = 256)
+    map(σ_grid) do σ
+        Random.seed!(11)
+        mean(run_filter_rw(merge(sim_base, Dict(:σ => σ)), obs, n_particles;
+                           nchunks = 4) for _ in 1:n_rep)
+    end
+end
+
+σ_true = 0.15
+peaks, gains = Float64[], Float64[]
+for rep in 1:10
+    Random.seed!(1000 + rep)
+    obs, _, _ = simulate_rw_data(
+        Random.default_rng(), merge(sim_base, Dict(:σ => σ_true)), n_obs
+    )
+    ll = σ_profile(obs)
+    push!(peaks, σ_grid[argmax(ll)])
+    push!(gains, maximum(ll) - ll[1])
+end
+```
+
+```{julia}
+println("ten datasets simulated at σ = ", σ_true)
+println("  where the profile peaks: ", peaks)
+println("  log-likelihood gained over σ = 0: ", round.(gains, digits = 1))
+println("  median peak: ", median(peaks), ", median gain: ", round(median(gains), digits = 1))
+```
+
+The median peak lands close to the truth, so the signal is there.
+On any one dataset it lands most of the way across the grid, and on a few of the ten the gain over $\sigma = 0$ is a couple of log units, which is nothing.
+Remember that this is the generous case: the other five parameters were held at the values the data came from, and no real fit knows those.
+
+So $\sigma$ is identifiable in principle and unreliable in practice, from one outbreak of this length.
+That is the honest summary, and it is worth more than a fitted trajectory would have been.
+
+::: {.callout-tip title="Exercise: why does SEIT4L not want a time-varying β?"}
+The [universal differential equations session](universal_differential_equations.qmd) fits a time-varying $\beta$ to these same data and finds one it can use — a $\beta$ that falls and then climbs steeply through the second wave.
+Here the data have almost nothing to say about $\sigma$, and the best point on the surface above is at $\sigma = 0$.
+
+Both fits are correct.
+What is different?
+:::
+
+::: {.callout-tip title="Solution" collapse="true"}
+**The structure underneath.** The UDE session puts $\beta(t)$ inside an SIR model, in which the susceptible pool only ever shrinks. An SIR model cannot produce a second wave at all, so the only way to fit one is for $\beta$ to climb and keep climbing. That session says so directly: the network is compensating for something the structure cannot do.
+
+SEIT4L already has a mechanism for the second wave.
+Temporary immunity returns people to the susceptible pool on an Erlang-4 schedule, which is the hypothesis the [SEITL session](seitl.qmd) is built on and the one the [particle MCMC session](pmcmc.qmd) finds the data prefer.
+With that mechanism present there is nothing left for a time-varying rate to explain, so the likelihood stops asking for one and the prior takes over.
+
+The general form is worth carrying away.
+A flexible time-varying component absorbs whatever the fixed structure gets wrong, so a large fitted $\sigma$ is evidence about your model at least as much as about the epidemic.
+The useful question is not "did transmission vary?" but "does transmission have to vary, given everything else I have written down?"
+:::
+
+# Learning points
+
+::: {.callout-tip title="Learning points"}
+- **A time-varying rate in the latent state costs almost nothing** — one extra state component, a few per cent per filter run, and one more parameter for the outer sampler
+- **A particle filter's log-likelihood has no gradient**, because a Gillespie simulator selects events by comparison and reports integer counts. At a fixed seed the surface is a step function, so the derivative is zero between the steps and undefined at them
+- **`ForwardDiff.value` turns that into a silent failure.** It lets a gradient-based sampler run on a filter likelihood and return the prior, with no warning
+- **So a quantity with one value per observation belongs in the state.** The usual argument for making it a parameter rests on a gradient that is not there
+- **A multiplicative random walk on $\beta$ trades against $\beta_0$**, opening a ridge along which the likelihood is nearly flat. The posterior for its scale then follows the priors on the other parameters rather than the data
+- **Checking identifiability one parameter at a time cannot find a ridge**, and a ridge is what a flexible time-varying component creates
+:::
+
+# Going further
+
+## Getting the gradient back
+
+Two routes, both of which change the model rather than the sampler.
+
+A **diffusion approximation** replaces the Gillespie simulator with a stochastic differential equation, whose output is a smooth function of $\beta$.
+That buys differentiability at the cost of the discreteness that matters most in a population of 284, which is why the stochastic track uses a jump process in the first place.
+[Dureau, Kalogeropoulos & Baguelin (2013)](https://doi.org/10.1093/biostatistics/kxs052) fit exactly this model — a diffusion on $\log \beta$ inside an epidemic model, estimated by PMCMC — and it is the closest published relative of what this session does.
+
+**Particle Gibbs** splits the problem instead of approximating it. Conditional SMC draws a complete epidemic path given the parameters, and the complete-data likelihood of a Markov jump process, conditional on knowing every event and its time, is available in closed form and is differentiable. A gradient-based sampler can then update $\beta_{1:T}$ given that path. `GeneralisedFilters`' bootstrap filter accepts a `ref_state` keyword, which is the conditional SMC operation this needs. The cost is that the two blocks are strongly dependent, so the sampler mixes slowly for the reason any Gibbs sampler does when its blocks are correlated.
+
+## Structures that identify better
+
+A random walk is the least informative choice available, and its scale is correspondingly the hardest thing to identify.
+If you expect something more structured, say so in the model: a single change point at the date a control measure came in, a smooth trend with few degrees of freedom, or a rate that depends on observed prevalence.
+Every constraint is signal the 59 observations no longer have to supply.
+
+Mean reversion is worth considering for its own sake.
+An Ornstein-Uhlenbeck process on $\log \beta$ pulls back towards a level instead of wandering, which closes the particular ridge this session found: the implied mean transmission rate no longer grows with $\sigma$, so $\sigma$ can no longer pay for a smaller $R_0$.
+
+## More data
+
+The single clearest way to identify $\sigma$ is more of the series.
+Nothing in this section is specific to Tristan da Cunha except its length, and 59 daily counts of one small outbreak is very little to ask a 59-step random walk to reveal itself in.
+
+# References
+
+- Andrieu et al. (2010). [Particle Markov chain Monte Carlo methods](https://doi.org/10.1111/j.1467-9868.2009.00736.x). *JRSS B* 72(3), 269-342.
+- Dureau, Kalogeropoulos & Baguelin (2013). [Capturing the time-varying drivers of an epidemic using stochastic dynamical systems](https://doi.org/10.1093/biostatistics/kxs052). *Biostatistics* 14(3), 541-555.
+- Lindsten, Jordan & Schön (2014). [Particle Gibbs with ancestor sampling](https://jmlr.org/papers/v15/lindsten14a.html). *JMLR* 15, 2145-2184.
+- Camacho et al. (2011). [Explaining rapid reinfections in multiple-wave influenza outbreaks](https://doi.org/10.1098/rspb.2011.0300). *Proc. R. Soc. B* 278, 3635-3643.
